@@ -62,7 +62,19 @@ public class ClinicalAssistantService {
         context.put("modelAvailable", predictionService.isModelAvailable());
 
         if (containsAny(lower, "doctor", "overload", "load", "balance", "capacity", "physician")) {
+            Optional<Doctor> matchedDoc = findMentionedDoctor(doctors, lower);
+            if (matchedDoc.isPresent()) {
+                return buildSingleDoctorContextResponse(matchedDoc.get(), activeAppts, context);
+            }
             return buildDoctorLoadResponse(doctors, activeAppts, context);
+        }
+        Optional<Doctor> directDoc = findMentionedDoctor(doctors, lower);
+        if (directDoc.isPresent()) {
+            return buildSingleDoctorContextResponse(directDoc.get(), activeAppts, context);
+        }
+        Optional<Patient> matchedPatient = findMentionedPatient(patients, lower);
+        if (matchedPatient.isPresent()) {
+            return buildSinglePatientContextResponse(matchedPatient.get(), allAppts, pendingReminders, doctors, context);
         }
         if (containsAny(lower, "reminder", "outreach", "sms", "call", "notify", "plan")) {
             return buildReminderPlanResponse(pendingReminders, activeAppts, context);
@@ -317,6 +329,118 @@ public class ClinicalAssistantService {
         resp.put("recommendedActions", recommendedActions);
         resp.put("clinicContext", clinicContext);
         return resp;
+    }
+
+    private Optional<Patient> findMentionedPatient(List<Patient> patients, String lowerQuery) {
+        for (Patient p : patients) {
+            if (lowerQuery.contains(String.valueOf(p.getId()))
+                    || lowerQuery.contains(p.getName().toLowerCase(Locale.ROOT))) {
+                return Optional.of(p);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Doctor> findMentionedDoctor(List<Doctor> doctors, String lowerQuery) {
+        for (Doctor d : doctors) {
+            if (lowerQuery.contains(String.valueOf(d.getId()))) {
+                return Optional.of(d);
+            }
+            String docLower = d.getName().toLowerCase(Locale.ROOT).replace("dr.", "").trim();
+            for (String token : docLower.split("\\s+")) {
+                if (token.length() >= 4 && lowerQuery.contains(token)) {
+                    return Optional.of(d);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Map<String, Object> buildSinglePatientContextResponse(Patient patient,
+                                                                    List<Appointment> allAppts,
+                                                                    List<ReminderRecord> pendingReminders,
+                                                                    List<Doctor> doctors,
+                                                                    Map<String, Object> context) {
+        List<Appointment> history = allAppts.stream()
+                .filter(a -> a.getPatient() != null && a.getPatient().getId().equals(patient.getId()))
+                .collect(Collectors.toList());
+        long noShows = history.stream().filter(a -> a.getAttendanceStatus() == AttendanceStatus.NO_SHOW).count();
+        long attended = history.stream().filter(a -> a.getAttendanceStatus() == AttendanceStatus.ATTENDED).count();
+
+        Doctor doc = doctors.isEmpty()
+                ? new Doctor(201L, "Dr. Beatriz Silva", Gender.F, 42, "Cardiology", "Room 201")
+                : doctors.get(0);
+        List<AppointmentService.LowerRiskSlot> slots = appointmentService.findLowerRiskSlots(
+                patient, doc, LocalDate.now(), 7, "CENTRO");
+
+        List<String> reasoning = List.of(
+                String.format(Locale.US, "Located patient #%d (%s, Age %d, Chronic conditions: %s).",
+                        patient.getId(), patient.getName(), patient.getAge(), patient.hasChronicConditions() ? "Yes" : "No"),
+                String.format(Locale.US, "Reviewed %d historical/active appointments (%d attended, %d no-show).",
+                        history.size(), attended, noShows),
+                "Evaluated upcoming 7-day booking risk via Weka Random Forest for personalized outreach."
+        );
+
+        List<Map<String, Object>> actions = new ArrayList<>();
+        if (!slots.isEmpty()) {
+            AppointmentService.LowerRiskSlot best = slots.get(0);
+            actions.add(Map.of(
+                    "detail", String.format(Locale.US, "Best upcoming slot: %s at %s (%.1f%% no-show, %s)",
+                            best.getDate(), best.getTime(), best.getNoShowProbability() * 100.0, best.getRiskCategory()),
+                    "oneClickAction", Map.of(
+                            "type", "APPLY_SLOT",
+                            "label", "Book " + best.getDate() + " for " + patient.getName(),
+                            "date", best.getDate().toString(),
+                            "time", best.getTime().toString()
+                    )
+            ));
+        }
+        pendingReminders.stream()
+                .filter(r -> r.getPatientName().equalsIgnoreCase(patient.getName()))
+                .findFirst()
+                .ifPresent(r -> actions.add(Map.of(
+                        "detail", "Pending reminder #" + r.getReminderId() + " (" + r.getRecommendedAction() + ")",
+                        "oneClickAction", Map.of(
+                                "type", "SEND_REMINDER",
+                                "label", "Send " + r.getRecommendedAction() + " Now",
+                                "endpoint", "/api/reminders/send",
+                                "reminderId", r.getReminderId()
+                        )
+                )));
+
+        String answer = String.format(Locale.US,
+                "Patient %s (ID %d, Age %d): %d appointment(s) on record (%d attended, %d no-show).",
+                patient.getName(), patient.getId(), patient.getAge(), history.size(), attended, noShows);
+        return assembleResponse("PATIENT_CONTEXT", answer, reasoning, actions, context);
+    }
+
+    private Map<String, Object> buildSingleDoctorContextResponse(Doctor doctor,
+                                                                   List<Appointment> activeAppts,
+                                                                   Map<String, Object> context) {
+        List<Appointment> docAppts = activeAppts.stream()
+                .filter(a -> a.getDoctor() != null && a.getDoctor().getId().equals(doctor.getId()))
+                .collect(Collectors.toList());
+
+        List<String> reasoning = List.of(
+                String.format(Locale.US, "Matched physician %s (ID %d, %s, %s).",
+                        doctor.getName(), doctor.getId(), doctor.getSpecialty(), doctor.getRoomNumber()),
+                String.format(Locale.US, "Counted %d active/upcoming appointments in current clinic schedule.", docAppts.size()),
+                "Availability status: " + (doctor.isAvailable() ? "Available for new or backfill bookings." : "Currently unavailable.")
+        );
+
+        List<Map<String, Object>> actions = docAppts.stream().limit(4).map(a -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("appointmentId", a.getAppointmentId());
+            item.put("detail", String.format(Locale.US, "%s — %s on %s (%s)",
+                    a.getQueueToken(), a.getPatient() != null ? a.getPatient().getName() : "Patient",
+                    a.getAppointmentDay(), a.getAttendanceStatus()));
+            return item;
+        }).collect(Collectors.toList());
+
+        String answer = String.format(Locale.US, "%s (%s, %s) currently has %d active appointment(s) and is %s.",
+                doctor.getName(), doctor.getSpecialty(), doctor.getRoomNumber(), docAppts.size(),
+                doctor.isAvailable() ? "available" : "unavailable");
+        return assembleResponse("DOCTOR_CONTEXT", answer, reasoning, actions, context);
     }
 
     private static boolean containsAny(String text, String... keywords) {

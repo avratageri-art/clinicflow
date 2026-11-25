@@ -9,6 +9,11 @@
 > **Live Deployed Demo:** [https://clinicflow-9uhp.onrender.com/](https://clinicflow-9uhp.onrender.com/)  
 > **Health Endpoint:** [https://clinicflow-9uhp.onrender.com/health](https://clinicflow-9uhp.onrender.com/health)
 
+### Executive Summary: Problem -> AI Copilot Solution -> Measurable Clinical Impact
+- **Problem:** Outpatient clinics lose ~20% of scheduled slots to patient no-shows, leaving physicians idle while high-need patients wait weeks.
+- **AI Copilot Solution:** ClinicFlow combines a **Weka Random Forest** classifier with a **context-aware Smart Clinical Assistant** (`POST /api/assistant/query`) that inspects live patients, doctors, queue load, and pending reminders to recommend targeted outreach and lower-risk booking slots.
+- **Measurable Clinical Impact:** Identifies elevated-risk bookings at scheduling time (`LOW < 20%`, `MEDIUM 20–49.9%`, `HIGH >= 50%`), prioritizes coordinator phone/SMS outreach, balances physician load, and preserves **strict FIFO queue fairness** with zero automated patient denial.
+
 ---
 
 ## 1. Problem Statement & Chosen Vertical
@@ -76,7 +81,35 @@ Every feature documented here is implemented and wired end-to-end:
 
 ---
 
-## 6. Quickstart & Deployment
+## 6. Live Demo Walkthrough
+
+1. Open [https://clinicflow-9uhp.onrender.com/](https://clinicflow-9uhp.onrender.com/) — the **Smart Clinical Assistant** auto-loads a live operational briefing on startup.
+2. Click any quick-action chip (or ask `"Assess patient 1001"` / `"Check Dr. Beatriz Silva"`):
+```bash
+curl -s -X POST https://clinicflow-9uhp.onrender.com/api/assistant/query \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Who are my highest-risk patients?"}'
+```
+Sample response:
+```json
+{
+  "intent": "HIGH_RISK_TRIAGE",
+  "answer": "Found 1 active scored appointments (0 MEDIUM/HIGH risk)...",
+  "reasoningSteps": ["Inspected 1 active/upcoming appointments using Weka Random Forest probabilities."],
+  "recommendedActions": [{"patientName": "K Kalash", "riskCategory": "LOW", "oneClickAction": {"type": "SEND_REMINDER"}}]
+}
+```
+3. Run a live risk simulation:
+```bash
+curl -s -X POST https://clinicflow-9uhp.onrender.com/api/predict \
+  -H "Content-Type: application/json" \
+  -d '{"age":30,"gender":"F","appointmentDay":"2026-12-05","neighbourhood":"CENTRO"}'
+```
+Returns `noShowProbability`, `riskCategory`, `triageGuidance`, and clickable `recommendedAlternativeSlots`.
+
+---
+
+## 7. Quickstart & Deployment
 
 ```bash
 # Run full automated test suite (JUnit 5 + AssertJ)

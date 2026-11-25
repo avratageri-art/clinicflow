@@ -93,12 +93,27 @@ class ClinicFlowWebServerTest {
         HttpResponse<String> badAge = post("/api/predict", "{\"age\":150}");
         assertThat(badAge.statusCode()).isEqualTo(400);
 
-        // 3. Oversized payload (> 64 KB) returns 400
+        // 3. Oversized payload (> 64 KB) returns 413 Payload Too Large with unified error envelope
         String huge = "{\"name\":\"" + "A".repeat(70_000) + "\",\"age\":30}";
         HttpResponse<String> hugeResp = post("/api/patients", huge);
-        assertThat(hugeResp.statusCode()).isEqualTo(400);
+        assertThat(hugeResp.statusCode()).isEqualTo(413);
+        assertThat(hugeResp.body()).contains("\"code\":413", "\"timestamp\"");
 
-        // 4. CSV formula injection sanitizer neutralizes leading triggers while keeping E.164 phone numbers
+        // 4. Control characters rejected with 400
+        HttpResponse<String> ctrlResp = post("/api/patients", "{\"name\":\"Bad\\u0007Name\",\"age\":30}");
+        assertThat(ctrlResp.statusCode()).isEqualTo(400);
+
+        // 5. Wrong HTTP method returns 405 with Allow header and Cache-Control: no-store
+        HttpResponse<String> methodResp = client.send(
+                HttpRequest.newBuilder(URI.create(baseUrl + "/api/predict")).GET().build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+        assertThat(methodResp.statusCode()).isEqualTo(405);
+        assertThat(methodResp.headers().firstValue("Allow")).contains("POST");
+        assertThat(methodResp.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(methodResp.headers().firstValue("Permissions-Policy")).isPresent();
+
+        // 6. CSV formula injection sanitizer neutralizes leading triggers while keeping E.164 phone numbers
         assertThat(com.clinicflow.repository.CsvSanitizer.sanitize("=CMD('calc')")).isEqualTo("'=CMD('calc')");
         assertThat(com.clinicflow.repository.CsvSanitizer.sanitize("@SUM(A1:A2)")).isEqualTo("'@SUM(A1:A2)");
         assertThat(com.clinicflow.repository.CsvSanitizer.sanitizeContact("+55-27-99123-4567")).isEqualTo("+55-27-99123-4567");
@@ -151,14 +166,30 @@ class ClinicFlowWebServerTest {
         assertThat(complete.statusCode()).isEqualTo(200);
         assertThat(complete.body()).contains("ATTENDED");
 
-        // 5. Smart Clinical Assistant context-aware queries
+        // 5. Smart Clinical Assistant context-aware queries across all intents
         HttpResponse<String> briefResp = post("/api/assistant/query", "{\"query\":\"Give me today's clinic briefing\"}");
         assertThat(briefResp.statusCode()).isEqualTo(200);
         assertThat(briefResp.body()).contains("CLINIC_BRIEFING", "reasoningSteps", "clinicContext");
 
+        HttpResponse<String> riskResp = post("/api/assistant/query", "{\"query\":\"Who are my highest-risk patients?\"}");
+        assertThat(riskResp.statusCode()).isEqualTo(200);
+        assertThat(riskResp.body()).contains("HIGH_RISK_TRIAGE");
+
+        HttpResponse<String> remResp = post("/api/assistant/query", "{\"query\":\"Generate today's reminder action plan\"}");
+        assertThat(remResp.statusCode()).isEqualTo(200);
+        assertThat(remResp.body()).contains("REMINDER_ACTION_PLAN");
+
         HttpResponse<String> docLoadResp = post("/api/assistant/query", "{\"query\":\"Which doctors are overloaded?\"}");
         assertThat(docLoadResp.statusCode()).isEqualTo(200);
         assertThat(docLoadResp.body()).contains("DOCTOR_LOAD_BALANCING", "Dr. Lucas Almeida");
+
+        HttpResponse<String> docCtxResp = post("/api/assistant/query", "{\"query\":\"Check Dr. Beatriz Silva\"}");
+        assertThat(docCtxResp.statusCode()).isEqualTo(200);
+        assertThat(docCtxResp.body()).contains("DOCTOR_CONTEXT", "Beatriz Silva");
+
+        HttpResponse<String> patCtxResp = post("/api/assistant/query", "{\"query\":\"Assess patient " + patientId + "\"}");
+        assertThat(patCtxResp.statusCode()).isEqualTo(200);
+        assertThat(patCtxResp.body()).contains("PATIENT_CONTEXT", "Elena Rostova");
 
         HttpResponse<String> slotResp = post("/api/assistant/query", "{\"query\":\"Suggest optimal low-risk slots\",\"patientId\":" + patientId + "}");
         assertThat(slotResp.statusCode()).isEqualTo(200);
@@ -174,6 +205,38 @@ class ClinicFlowWebServerTest {
         );
         assertThat(dash.statusCode()).isEqualTo(200);
         assertThat(dash.body()).contains("\"totalPatients\":1", "\"attendedCount\":1");
+    }
+
+    @Test
+    @DisplayName("Full queue lifecycle: start consultation, record no-show, and cancel appointment")
+    void testQueueLifecycleTransitions() throws Exception {
+        HttpResponse<String> patResp = post("/api/patients", "{\"name\":\"Queue Patient\",\"gender\":\"M\",\"age\":45}");
+        @SuppressWarnings("unchecked")
+        long pid = ((Number) ((Map<String, Object>) JsonUtil.parseObject(patResp.body()).get("patient")).get("id")).longValue();
+        String today = LocalDate.now().toString();
+
+        // Book appt 1 -> checkin -> start -> complete
+        HttpResponse<String> b1 = post("/api/appointments",
+                "{\"patientId\":" + pid + ",\"doctorId\":201,\"appointmentDay\":\"" + today + "\",\"appointmentTime\":\"13:00\"}");
+        @SuppressWarnings("unchecked")
+        long a1 = ((Number) ((Map<String, Object>) JsonUtil.parseObject(b1.body()).get("appointment")).get("appointmentId")).longValue();
+        assertThat(post("/api/queue/checkin", "{\"appointmentId\":" + a1 + "}").statusCode()).isEqualTo(200);
+        assertThat(post("/api/queue/start", "{\"appointmentId\":" + a1 + "}").body()).contains("IN_CONSULTATION");
+        assertThat(post("/api/queue/complete", "{\"appointmentId\":" + a1 + "}").body()).contains("ATTENDED");
+
+        // Book appt 2 -> noshow
+        HttpResponse<String> b2 = post("/api/appointments",
+                "{\"patientId\":" + pid + ",\"doctorId\":201,\"appointmentDay\":\"" + today + "\",\"appointmentTime\":\"14:00\"}");
+        @SuppressWarnings("unchecked")
+        long a2 = ((Number) ((Map<String, Object>) JsonUtil.parseObject(b2.body()).get("appointment")).get("appointmentId")).longValue();
+        assertThat(post("/api/queue/noshow", "{\"appointmentId\":" + a2 + "}").body()).contains("NO_SHOW");
+
+        // Book appt 3 -> cancel
+        HttpResponse<String> b3 = post("/api/appointments",
+                "{\"patientId\":" + pid + ",\"doctorId\":201,\"appointmentDay\":\"" + today + "\",\"appointmentTime\":\"15:00\"}");
+        @SuppressWarnings("unchecked")
+        long a3 = ((Number) ((Map<String, Object>) JsonUtil.parseObject(b3.body()).get("appointment")).get("appointmentId")).longValue();
+        assertThat(post("/api/queue/cancel", "{\"appointmentId\":" + a3 + "}").body()).contains("CANCELLED");
     }
 
     private HttpResponse<String> post(String path, String jsonBody) throws Exception {

@@ -213,11 +213,11 @@
   </header>
 
   <nav aria-label="Primary navigation" role="tablist">
-    <button type="button" role="tab" aria-selected="true" aria-controls="tab-overview" id="btn-overview" onclick="switchTab('overview')">Overview &amp; Risk Simulator</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="tab-appointments" id="btn-appointments" onclick="switchTab('appointments')">Appointments</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="tab-queue" id="btn-queue" onclick="switchTab('queue')">Clinic Queue (FIFO)</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="tab-patients" id="btn-patients" onclick="switchTab('patients')">Patients &amp; Reminders</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="tab-model" id="btn-model" onclick="switchTab('model')">ML Model Insights</button>
+    <button type="button" role="tab" aria-selected="true" aria-controls="tab-overview" aria-keyshortcuts="Alt+1" id="btn-overview" onclick="switchTab('overview')">Overview &amp; Risk Simulator</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-appointments" aria-keyshortcuts="Alt+2" id="btn-appointments" onclick="switchTab('appointments')">Appointments</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-queue" aria-keyshortcuts="Alt+3" id="btn-queue" onclick="switchTab('queue')">Clinic Queue (FIFO)</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-patients" aria-keyshortcuts="Alt+4" id="btn-patients" onclick="switchTab('patients')">Patients &amp; Reminders</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-model" aria-keyshortcuts="Alt+5" id="btn-model" onclick="switchTab('model')">ML Model Insights</button>
   </nav>
 
   <main id="main-content" tabindex="-1">
@@ -236,18 +236,19 @@
       <div class="card" style="margin-bottom:1.25rem;" id="copilot-card">
         <h2>Smart Clinical Assistant (AI Copilot)</h2>
         <p>Ask context-aware operational questions. ClinicFlow inspects live patients, doctors, ML no-show probabilities, FIFO queue load, and pending reminders to reason and recommend 1-click actions.</p>
-        <form onsubmit="submitAssistantForm(event)" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+        <form onsubmit="submitAssistantForm(event)" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.4rem;">
           <label for="assistant-query" class="skip-link">Ask the Smart Clinical Assistant</label>
-          <input id="assistant-query" type="text" placeholder="Ask about high-risk patients, doctor load, reminder plan, or optimal slots..." style="flex:1; min-width:240px;" required />
+          <input id="assistant-query" type="text" aria-describedby="assistant-query-hint" placeholder="Ask about high-risk patients, doctor load, reminder plan, or optimal slots..." style="flex:1; min-width:240px;" required />
           <button class="btn" type="submit" aria-label="Ask Smart Clinical Assistant">Ask Assistant</button>
         </form>
+        <p id="assistant-query-hint" style="margin:0 0 0.6rem; font-size:0.82rem; color:var(--muted);">Tip: You can ask by patient ID/name (e.g., "Assess patient 1001") or doctor name (e.g., "Check Dr. Beatriz Silva").</p>
         <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.75rem;" role="group" aria-label="Quick assistant prompts">
           <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Who are my highest-risk patients?')">Highest-Risk Patients</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Which doctors are overloaded?')">Doctor Load Balance</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Generate today\'s reminder action plan')">Reminder Action Plan</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Suggest optimal low-risk slots')">Optimal Low-Risk Slots</button>
         </div>
-        <div id="assistant-output" class="alert" aria-live="polite">Loading live clinic briefing...</div>
+        <div id="assistant-output" class="alert" role="status" aria-live="polite">Loading live clinic briefing...</div>
       </div>
 
       <div class="card">
@@ -257,7 +258,8 @@
           <div class="form-grid">
             <div>
               <label for="sim-age">Patient Age</label>
-              <input id="sim-age" type="number" min="0" max="120" value="32" required />
+              <input id="sim-age" type="number" min="0" max="120" value="32" aria-describedby="sim-age-hint" required />
+              <small id="sim-age-hint" style="color:var(--muted); font-size:0.78rem;">Valid range: 0–120 years</small>
             </div>
             <div>
               <label for="sim-gender">Gender</label>
@@ -389,7 +391,7 @@
     <section id="tab-model" class="panel" role="tabpanel" aria-labelledby="btn-model">
       <div class="card">
         <h2>ML Engine &amp; Evaluation Metrics</h2>
-        <div id="model-insights-body" aria-live="polite">Loading model insights...</div>
+        <div id="model-insights-body" role="status" aria-live="polite">Loading model insights...</div>
         <div style="margin-top:1rem;">
           <button class="btn" type="button" onclick="retrainModel()" aria-label="Retrain Weka Random Forest model">Retrain Model</button>
         </div>
@@ -398,7 +400,7 @@
   </main>
 
   <footer>
-    ClinicFlow &mdash; Advisory AI Decision Support Only (No Automated Patient Denial)
+    ClinicFlow &mdash; Advisory AI Decision Support Only (No Automated Patient Denial) &bull; Keyboard shortcuts: Alt+1..Alt+5 to switch tabs
   </footer>
 
   <script>
@@ -701,6 +703,15 @@
         showToast('Retrain error: ' + err.message);
       }
     }
+
+    document.addEventListener('keydown', (e) => {
+      if (!e.altKey) return;
+      const tabs = { '1': 'overview', '2': 'appointments', '3': 'queue', '4': 'patients', '5': 'model' };
+      if (tabs[e.key]) {
+        e.preventDefault();
+        switchTab(tabs[e.key]);
+      }
+    });
 
     refreshAll();
     askAssistant("Give me today's clinic briefing");
