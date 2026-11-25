@@ -30,4 +30,4 @@ ENV PORT=8080
 ENV CLINICFLOW_HOME=/app
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Djava.awt.headless=true", "-jar", "/app/clinicflow.jar", "--server"]
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xms64m", "-Xmx300m", "-Djava.awt.headless=true", "-jar", "/app/clinicflow.jar", "--server"]
