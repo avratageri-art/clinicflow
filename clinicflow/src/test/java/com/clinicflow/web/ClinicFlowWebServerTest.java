@@ -73,7 +73,16 @@ class ClinicFlowWebServerTest {
                 HttpResponse.BodyHandlers.ofString()
         );
         assertThat(resp.statusCode()).isEqualTo(200);
-        assertThat(resp.body()).contains("<header>", "<nav ", "<main ", "aria-label=", "aria-live=", "aria-pressed=");
+        String html = resp.body();
+        assertThat(html).contains("<html lang=\"en\">", "href=\"#main-content\"", "<main id=\"main-content\"",
+                "<header>", "<nav aria-label=", "<footer>", "role=\"status\"", "aria-live=\"polite\"",
+                "role=\"alert\"", "aria-live=\"assertive\"", "aria-pressed=", "scope=\"col\"",
+                "<caption", "prefers-reduced-motion", "aria-hidden=\"true\"");
+        java.util.regex.Matcher inputMatcher = java.util.regex.Pattern.compile("<input[^>]*id=\"([^\"]+)\"").matcher(html);
+        while (inputMatcher.find()) {
+            String inputId = inputMatcher.group(1);
+            assertThat(html).as("Missing label for input#" + inputId).contains("for=\"" + inputId + "\"");
+        }
         assertThat(resp.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
         assertThat(resp.headers().firstValue("X-Frame-Options")).contains("DENY");
         assertThat(resp.headers().firstValue("Referrer-Policy")).contains("no-referrer");

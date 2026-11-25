@@ -39,6 +39,25 @@
       z-index: 1000;
     }
     .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
     :focus-visible {
       outline: 3px solid var(--focus);
       outline-offset: 2px;
@@ -222,6 +241,7 @@
 
   <main id="main-content" tabindex="-1">
     <div id="global-toast" class="alert" role="status" aria-live="polite" style="display:none;"></div>
+    <div id="error-alert" class="alert" role="alert" aria-live="assertive" style="display:none; background:#fee2e2; border-color:#b91c1c; color:#7f1d1d;"></div>
 
     <!-- OVERVIEW & SMART RISK SIMULATOR -->
     <section id="tab-overview" class="panel active" role="tabpanel" aria-labelledby="btn-overview">
@@ -236,9 +256,9 @@
       <div class="card" style="margin-bottom:1.25rem;" id="copilot-card">
         <h2>Smart Clinical Assistant (AI Copilot)</h2>
         <p>Ask context-aware operational questions. ClinicFlow inspects live patients, doctors, ML no-show probabilities, FIFO queue load, and pending reminders to reason and recommend 1-click actions.</p>
-        <form onsubmit="submitAssistantForm(event)" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.4rem;">
-          <label for="assistant-query" class="skip-link">Ask the Smart Clinical Assistant</label>
-          <input id="assistant-query" type="text" aria-describedby="assistant-query-hint" placeholder="Ask about high-risk patients, doctor load, reminder plan, or optimal slots..." style="flex:1; min-width:240px;" required />
+          <form onsubmit="submitAssistantForm(event)" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.4rem;">
+          <label for="assistant-query" class="sr-only">Ask the Smart Clinical Assistant</label>
+          <input id="assistant-query" type="text" aria-describedby="assistant-query-hint" aria-required="true" placeholder="Ask about high-risk patients, doctor load, reminder plan, or optimal slots..." style="flex:1; min-width:240px;" required />
           <button class="btn" type="submit" aria-label="Ask Smart Clinical Assistant">Ask Assistant</button>
         </form>
         <p id="assistant-query-hint" style="margin:0 0 0.6rem; font-size:0.82rem; color:var(--muted);">Tip: You can ask by patient ID/name (e.g., "Assess patient 1001") or doctor name (e.g., "Check Dr. Beatriz Silva").</p>
@@ -293,37 +313,38 @@
           <div class="form-grid">
             <div>
               <label for="book-patient">Patient</label>
-              <select id="book-patient" required></select>
+              <select id="book-patient" aria-required="true" required></select>
             </div>
             <div>
               <label for="book-doctor">Attending Doctor</label>
-              <select id="book-doctor" required></select>
+              <select id="book-doctor" aria-required="true" required></select>
             </div>
             <div>
               <label for="book-date">Appointment Date</label>
-              <input id="book-date" type="date" required />
+              <input id="book-date" type="date" aria-required="true" required />
             </div>
             <div>
               <label for="book-time">Time</label>
-              <input id="book-time" type="time" value="09:30" required />
+              <input id="book-time" type="time" value="09:30" aria-required="true" required />
             </div>
             <div>
               <label for="book-hood">Neighbourhood</label>
-              <input id="book-hood" type="text" value="CENTRO" required />
+              <input id="book-hood" type="text" value="CENTRO" aria-required="true" required />
             </div>
           </div>
           <button class="btn" type="submit" aria-label="Book appointment with ML risk check">Book &amp; Predict Risk</button>
         </form>
-        <div id="book-guidance" class="alert" aria-live="polite" style="display:none;"></div>
+        <div id="book-guidance" class="alert" role="status" aria-live="polite" style="display:none;"></div>
       </div>
 
       <div class="card">
         <h2>Scheduled Appointments</h2>
         <div class="table-wrap">
           <table aria-label="Scheduled appointments">
+            <caption class="sr-only">Scheduled outpatient appointments with ML no-show risk scores and coordinator actions</caption>
             <thead>
               <tr>
-                <th>Token</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Lead</th><th>No-Show Risk</th><th>Suggested Action</th><th>Status</th><th>Actions</th>
+                <th scope="col">Token</th><th scope="col">Patient</th><th scope="col">Doctor</th><th scope="col">Date</th><th scope="col">Lead</th><th scope="col">No-Show Risk</th><th scope="col">Suggested Action</th><th scope="col">Status</th><th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody id="appointments-body"></tbody>
@@ -339,8 +360,9 @@
         <p>Patients are ordered strictly by check-in arrival and scheduled time. Risk scores never demote patients in the queue.</p>
         <div class="table-wrap">
           <table aria-label="Today's clinic queue">
+            <caption class="sr-only">Today's active FIFO clinical queue</caption>
             <thead>
-              <tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Time</th><th>Status</th><th>Actions</th></tr>
+              <tr><th scope="col">Token</th><th scope="col">Patient</th><th scope="col">Doctor</th><th scope="col">Time</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
             </thead>
             <tbody id="queue-body"></tbody>
           </table>
@@ -354,9 +376,9 @@
         <h2>Register Patient</h2>
         <form onsubmit="registerPatient(event)">
           <div class="form-grid">
-            <div><label for="pat-name">Full Name</label><input id="pat-name" type="text" required /></div>
+            <div><label for="pat-name">Full Name</label><input id="pat-name" type="text" aria-required="true" required /></div>
             <div><label for="pat-gender">Gender</label><select id="pat-gender"><option value="F">F</option><option value="M">M</option></select></div>
-            <div><label for="pat-age">Age</label><input id="pat-age" type="number" min="0" max="125" value="30" required /></div>
+            <div><label for="pat-age">Age</label><input id="pat-age" type="number" min="0" max="120" value="30" aria-required="true" required /></div>
             <div><label for="pat-contact">Contact Number</label><input id="pat-contact" type="text" placeholder="+55-27-99000-0000" /></div>
           </div>
           <button class="btn" type="submit" aria-label="Register new patient">Register Patient</button>
@@ -367,9 +389,9 @@
         <h2>Register Doctor</h2>
         <form onsubmit="registerDoctor(event)">
           <div class="form-grid">
-            <div><label for="doc-name">Doctor Name</label><input id="doc-name" type="text" required /></div>
-            <div><label for="doc-specialty">Specialty</label><input id="doc-specialty" type="text" value="General Medicine" required /></div>
-            <div><label for="doc-room">Room Number</label><input id="doc-room" type="text" value="Room 108" required /></div>
+            <div><label for="doc-name">Doctor Name</label><input id="doc-name" type="text" aria-required="true" required /></div>
+            <div><label for="doc-specialty">Specialty</label><input id="doc-specialty" type="text" value="General Medicine" aria-required="true" required /></div>
+            <div><label for="doc-room">Room Number</label><input id="doc-room" type="text" value="Room 108" aria-required="true" required /></div>
             <div><label for="doc-contact">Contact Number</label><input id="doc-contact" type="text" placeholder="+55-27-98000-0000" /></div>
           </div>
           <button class="btn" type="submit" aria-label="Register new doctor">Register Doctor</button>
@@ -380,8 +402,9 @@
         <h2>Reminder Outreach Queue</h2>
         <div class="table-wrap">
           <table aria-label="Reminder outreach queue">
+            <caption class="sr-only">Pending and dispatched patient appointment reminders</caption>
             <thead>
-              <tr><th>Patient</th><th>Date</th><th>Risk</th><th>Action</th><th>Status</th><th>Dispatch</th></tr>
+              <tr><th scope="col">Patient</th><th scope="col">Date</th><th scope="col">Risk</th><th scope="col">Action</th><th scope="col">Status</th><th scope="col">Dispatch</th></tr>
             </thead>
             <tbody id="reminders-body"></tbody>
           </table>
@@ -424,7 +447,7 @@
       const safeRisk = escapeHtml(risk);
       const icons = { LOW: '✓ ', MEDIUM: '! ', HIGH: '▲ ' };
       const prefix = icons[risk] || '';
-      return `<span class="badge badge-${safeRisk}">${prefix}${safeRisk}${escapeHtml(suffix || '')}</span>`;
+      return `<span class="badge badge-${safeRisk}"><span aria-hidden="true">${prefix}</span>${safeRisk}${escapeHtml(suffix || '')}</span>`;
     }
 
     function toggleHighContrast() {
@@ -442,8 +465,8 @@
       refreshAll();
     }
 
-    function showToast(msg) {
-      const el = document.getElementById('global-toast');
+    function showToast(msg, isError) {
+      const el = document.getElementById(isError ? 'error-alert' : 'global-toast');
       el.textContent = msg;
       el.style.display = 'block';
       setTimeout(() => { el.style.display = 'none'; }, 5000);
