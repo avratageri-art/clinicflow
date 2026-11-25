@@ -43,11 +43,12 @@ public final class ApplicationConfig {
      */
     public ApplicationConfig(Path workingDir, Map<String, String> env) {
         this.projectRoot = resolveProjectRoot(workingDir, env);
+        Path writableRoot = Files.isWritable(projectRoot) ? projectRoot : Paths.get(System.getProperty("java.io.tmpdir"), "clinicflow");
         this.rawDataPath = projectRoot.resolve("data").resolve("raw").resolve("appointments.csv");
-        this.processedDataPath = projectRoot.resolve("data").resolve("processed");
-        this.appDataPath = projectRoot.resolve("data").resolve("app");
-        this.modelsPath = projectRoot.resolve("models");
-        this.reportsPath = projectRoot.resolve("reports");
+        this.processedDataPath = writableRoot.resolve("data").resolve("processed");
+        this.appDataPath = writableRoot.resolve("data").resolve("app");
+        this.modelsPath = writableRoot.resolve("models");
+        this.reportsPath = writableRoot.resolve("reports");
 
         double split = parseDoubleOrDefault(env.get("CLINICFLOW_TRAIN_TEST_SPLIT"), 0.80, "CLINICFLOW_TRAIN_TEST_SPLIT");
         this.trainTestSplitRatio = (split >= 0.10 && split <= 0.95) ? split : 0.80;

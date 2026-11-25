@@ -73,7 +73,6 @@ public class ClinicFlowWebServer {
         this.modelTrainer = new NoShowModelTrainer(new DataPreprocessor(), new ModelEvaluator(), new ModelRepository(), config);
 
         seedInitialDataIfNeeded();
-        ensureModelLoaded();
     }
 
     private void seedInitialDataIfNeeded() {
@@ -116,6 +115,7 @@ public class ClinicFlowWebServer {
 
         server.start();
         LOGGER.info("ClinicFlow web server listening on http://0.0.0.0:" + boundPort);
+        ensureModelLoaded();
     }
 
     public void stop() {
@@ -575,6 +575,9 @@ public class ClinicFlowWebServer {
         byte[] bytes = JsonUtil.toJson(payload).getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
         ex.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(bytes);
