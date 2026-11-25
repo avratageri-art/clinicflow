@@ -274,6 +274,45 @@ class ClinicFlowWebServerTest {
     }
 
     @Test
+    @DisplayName("Negative API paths: 404 unknown route, non-existent IDs, double-booking conflict, and model retrain")
+    void testNegativeRoutesAndModelEndpoints() throws Exception {
+        // 1. Unknown API route returns 404
+        HttpResponse<String> notFound = client.send(
+                HttpRequest.newBuilder(URI.create(baseUrl + "/api/nonexistent")).GET().build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+        assertThat(notFound.statusCode()).isEqualTo(404);
+
+        // 2. Non-existent appointment/reminder ID returns 404 JSON error
+        assertThat(post("/api/queue/checkin", "{\"appointmentId\":999999}").statusCode()).isEqualTo(404);
+        assertThat(post("/api/reminders/send", "{\"reminderId\":999999}").statusCode()).isEqualTo(404);
+
+        // 3. Double-booking same doctor/date/time returns 400/409 JSON error
+        HttpResponse<String> pat = post("/api/patients", "{\"name\":\"Double Book Test\",\"gender\":\"F\",\"age\":29}");
+        @SuppressWarnings("unchecked")
+        long pid = ((Number) ((Map<String, Object>) JsonUtil.parseObject(pat.body()).get("patient")).get("id")).longValue();
+        String day = LocalDate.now().plusDays(2).toString();
+        assertThat(post("/api/appointments",
+                "{\"patientId\":" + pid + ",\"doctorId\":201,\"appointmentDay\":\"" + day + "\",\"appointmentTime\":\"11:00\"}").statusCode())
+                .isEqualTo(201);
+        HttpResponse<String> dup = post("/api/appointments",
+                "{\"patientId\":" + pid + ",\"doctorId\":201,\"appointmentDay\":\"" + day + "\",\"appointmentTime\":\"11:00\"}");
+        assertThat(dup.statusCode()).isIn(400, 409);
+
+        // 4. Model insights and retrain endpoints succeed
+        HttpResponse<String> insights = client.send(
+                HttpRequest.newBuilder(URI.create(baseUrl + "/api/model/insights")).GET().build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+        assertThat(insights.statusCode()).isEqualTo(200);
+        assertThat(insights.body()).contains("RandomForest", "features", "accuracy");
+
+        HttpResponse<String> retrain = post("/api/model/retrain", "{}");
+        assertThat(retrain.statusCode()).isEqualTo(200);
+        assertThat(retrain.body()).contains("RETRAINED");
+    }
+
+    @Test
     @DisplayName("WebSecuritySupport bounds tracked IP buckets at MAX_TRACKED_IPS (2048)")
     void testRateLimiterMemoryBound() {
         WebSecuritySupport sec = new WebSecuritySupport();

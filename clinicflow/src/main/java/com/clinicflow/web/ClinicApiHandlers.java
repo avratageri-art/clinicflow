@@ -311,11 +311,11 @@ final class ClinicApiHandlers {
 
     private void handleApiException(HttpExchange ex, Exception e) throws IOException {
         if (e instanceof PayloadTooLargeException) security.sendError(ex, HTTP_PAYLOAD_TOO_LARGE, e.getMessage(), null);
+        else if (e instanceof EntityNotFoundException) security.sendError(ex, HTTP_NOT_FOUND, e.getMessage(), null);
+        else if (e instanceof DuplicateEntityException) security.sendError(ex, HTTP_CONFLICT, e.getMessage(), null);
         else if (e instanceof ValidationException || e instanceof IllegalArgumentException || e instanceof DateTimeParseException || e instanceof ClinicFlowException) {
             security.sendError(ex, HTTP_BAD_REQUEST, e.getMessage(), null);
-        } else if (e instanceof EntityNotFoundException) security.sendError(ex, HTTP_NOT_FOUND, e.getMessage(), null);
-        else if (e instanceof DuplicateEntityException) security.sendError(ex, HTTP_CONFLICT, e.getMessage(), null);
-        else {
+        } else {
             LOGGER.log(Level.SEVERE, "Unhandled API error", e);
             security.sendError(ex, HTTP_SERVER_ERROR, "Internal server error", null);
         }
