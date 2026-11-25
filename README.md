@@ -88,10 +88,31 @@ data/app/*.csv                                 DataPreprocessor, FeatureExtracto
                                                NoShowPredictor, ModelEvaluator)
 ```
 
+### API Endpoints
+| Method & Path | Purpose |
+| :--- | :--- |
+| `GET /health` | Service health and ML model readiness check |
+| `GET /api/dashboard` | Real-time KPI summary, queue count, and risk distribution |
+| `POST /api/predict` | Live Weka no-show prediction, `triageGuidance`, and lower-risk slots |
+| `GET / POST /api/patients` | List or register patients (validated + CSV-sanitized) |
+| `GET / POST /api/doctors` | List or register attending doctors |
+| `GET / POST /api/appointments` | List or book appointments with ML risk & queue token assignment |
+| `GET /api/queue` | Retrieve today's active FIFO queue |
+| `POST /api/queue/checkin` | Check in a scheduled appointment into today's queue |
+| `POST /api/queue/start` | Start consultation (`IN_CONSULTATION`) |
+| `POST /api/queue/complete` | Complete consultation (`ATTENDED`) |
+| `POST /api/queue/noshow` | Record patient no-show (`NO_SHOW`) |
+| `POST /api/queue/cancel` | Cancel an appointment (`CANCELLED`) |
+| `GET /api/reminders` | List pending/sent reminder outreach records |
+| `POST /api/reminders/send` | Simulate reminder dispatch and update audit log |
+| `GET /api/model/insights` | Model metadata, feature schema, and evaluation metrics |
+| `POST /api/model/retrain` | Retrain Weka Random Forest pipeline on demand |
+
 ### Directory Structure
 ```text
 .
-├── Dockerfile                  # Multi-stage Java 17 build for Google Cloud Run
+├── Dockerfile                  # Multi-stage Java 17 build (-XX:+UseSerialGC -Xms64m -Xmx300m)
+├── render.yaml                 # Render.com Blueprint (free-tier Docker web service)
 ├── .dockerignore               # Excludes build outputs, .git, and local staging dirs
 ├── .gitignore                  # Excludes target/, large datasets/models, IDE metadata
 ├── .env.example                # Optional environment variable overrides
@@ -107,8 +128,9 @@ data/app/*.csv                                 DataPreprocessor, FeatureExtracto
         │   ├── Main.java                 # Web server (--server / $PORT), CLI (--cli), Swing GUI
         │   ├── ml/                       # Preprocessing, FeatureExtractor, Trainer, Evaluator
         │   ├── model/                    # Patient, Doctor, Appointment, PredictionResult, RiskCategory
-        │   ├── repository/               # CSV & InMemory repositories
+        │   ├── repository/               # CSV & InMemory repositories + CsvSanitizer
         │   ├── service/                  # Clinical business logic & ML prediction service
+        │   ├── ui/                       # Desktop Swing panels (optional local GUI mode)
         │   ├── web/                      # ClinicFlowWebServer & JsonUtil
         │   └── util/                     # ApplicationConfig & domain exceptions
         ├── main/resources/web/index.html # Accessible single-page web UI
@@ -117,9 +139,9 @@ data/app/*.csv                                 DataPreprocessor, FeatureExtracto
 
 ### Security & Accessibility Safeguards
 - **No hardcoded secrets:** All configuration is environment-driven (`.env.example`); no API keys, tokens, or credentials exist in source control.
-- **Input validation & safe errors:** Request bodies are bounded (`256 KB`), dates/ages/IDs are validated via `DataValidator` and service guards, and errors return structured JSON without stack traces.
-- **Container hardening:** Multi-stage Docker build runs under a dedicated non-root `clinicflow` user and sets `X-Content-Type-Options: nosniff`.
-- **Accessibility (WCAG-oriented):** Semantic `<header>`, `<nav>`, `<main>`, and `<footer>` landmarks, skip-to-content link, explicit `<label for="...">` bindings, `aria-label` on controls, `aria-live="polite"` status regions, `:focus-visible` keyboard rings, and high-contrast badges.
+- **Input validation & CSV sanitization:** Request bodies are bounded (`64 KB`), string lengths and age bounds (`0–120`) are enforced, CSV cells are protected against formula injection (`CsvSanitizer`), and errors return structured JSON without stack traces.
+- **Container & HTTP hardening:** Multi-stage Docker build runs under non-root user `clinicflow` (`-Xmx300m` for 512 MB containers) and sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Content-Security-Policy`.
+- **Accessibility (WCAG 2.1 AA):** Semantic `<header>`, `<nav>`, `<main>`, and `<footer>` landmarks, skip-to-content link, explicit `<label for="...">` bindings, `aria-label` on controls, `aria-live="polite"` status regions, `:focus-visible` keyboard rings, text+icon risk badges (`✓ LOW`, `! MEDIUM`, `▲ HIGH`), and a header **High-Contrast Mode** toggle (`aria-pressed`).
 
 ---
 
@@ -127,7 +149,7 @@ data/app/*.csv                                 DataPreprocessor, FeatureExtracto
 
 - **Advisory-Only AI:** Risk predictions guide outreach intensity and slot suggestions only. High-risk patients are **never** denied care or demoted in the clinic queue (same-day queue order is strictly FIFO by check-in time).
 - **Compact Default Dataset:** To keep the repository lightweight (< 3 MB), `sample_appointments.csv` (200 records) is bundled for instant startup and testing. If the full 110,527-row Kaggle Medical Appointment No-Shows CSV is placed at `clinicflow/data/raw/appointments.csv`, ClinicFlow automatically uses it.
-- **Local Persistence:** Operational records (`patients.csv`, `doctors.csv`, `appointments.csv`, `reminders.csv`) are persisted locally via atomic CSV writes. In stateless Cloud Run containers, data resets on container recycle unless backed by a persistent volume or external database.
+- **Local & Ephemeral Persistence:** Operational records (`patients.csv`, `doctors.csv`, `appointments.csv`, `reminders.csv`) are persisted locally via atomic CSV writes. On stateless free-tier containers (Render / Cloud Run), container restarts reset ephemeral filesystem state unless backed by a persistent disk or external database.
 - **Simulated Reminders:** SMS/phone dispatches are simulated and audited locally without external messaging gateway charges.
 
 ---
