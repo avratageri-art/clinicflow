@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClinicFlow: Final Academic Project Report</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-light: #3b82f6;
+            --secondary: #0d9488;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --gray: #64748b;
+            --border: #e2e8f0;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            color: var(--dark);
+            background-color: #ffffff;
+            line-height: 1.65;
+            font-size: 11pt;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 50px;
+        }
+
+        /* Title Page */
+        .title-page {
+            text-align: center;
+            padding: 80px 20px 100px 20px;
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: 50px;
+        }
+
+        .title-page h1 {
+            font-size: 26pt;
+            color: var(--primary);
+            margin-bottom: 12px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .title-page .subtitle {
+            font-size: 14pt;
+            color: var(--secondary);
+            font-weight: 600;
+            margin-bottom: 40px;
+        }
+
+        .meta-box {
+            display: inline-block;
+            text-align: left;
+            background: #f1f5f9;
+            padding: 24px 36px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            margin-top: 30px;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .meta-box p {
+            margin: 6px 0;
+            font-size: 10.5pt;
+        }
+
+        .meta-box strong {
+            color: var(--primary);
+            display: inline-block;
+            width: 170px;
+        }
+
+        /* Typography */
+        h2 {
+            color: var(--primary);
+            font-size: 16pt;
+            border-bottom: 1.5px solid var(--border);
+            padding-bottom: 6px;
+            margin-top: 36px;
+            margin-bottom: 16px;
+            page-break-after: avoid;
+        }
+
+        h3 {
+            color: var(--secondary);
+            font-size: 13pt;
+            margin-top: 22px;
+            margin-bottom: 10px;
+            page-break-after: avoid;
+        }
+
+        h4 {
+            color: var(--dark);
+            font-size: 11.5pt;
+            margin-top: 14px;
+            margin-bottom: 8px;
+        }
+
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin: 10px 0 16px 28px;
+        }
+
+        li {
+            margin-bottom: 5px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 24px 0;
+            font-size: 10pt;
+            page-break-inside: avoid;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fdfdfd;
+        }
+
+        /* Callouts and Badges */
+        .callout {
+            background-color: #f8fafc;
+            border-left: 4px solid var(--secondary);
+            padding: 14px 18px;
+            margin: 16px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 9pt;
+            font-weight: 600;
+        }
+
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-red { background: #fee2e2; color: #b91c1c; }
+        .badge-blue { background: #dbeafe; color: #1d4ed8; }
+        .badge-amber { background: #fef3c7; color: #b45309; }
+
+        /* Code & Pre */
+        pre {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9.5pt;
+            overflow-x: auto;
+            margin: 14px 0;
+            page-break-inside: avoid;
+        }
+
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+            background: #f1f5f9;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 9.5pt;
+        }
+
+        /* Page Breaks */
+        @media print {
+            body {
+                font-size: 10pt;
+                line-height: 1.5;
+            }
+            .container {
+                max-width: 100%;
+                padding: 15mm 20mm;
+            }
+            .title-page {
+                page-break-after: always;
+                padding-top: 50mm;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+            h2 {
+                margin-top: 24pt;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- 1. TITLE PAGE -->
+    <div class="title-page">
+        <h1>CLINICFLOW</h1>
+        <div class="subtitle">An ML-Based Patient No-Show Prediction and Smart Queue Management System</div>
+        
+        <p style="text-align: center; color: var(--gray); font-size: 11pt; margin-top: 15px;">
+            A Final Academic Project Report submitted in partial fulfillment of the requirements for the degree of<br>
+            <strong>Bachelor of Engineering in Computer Science & Engineering</strong>
+        </p>
+
+        <div class="meta-box">
+            <p><strong>Candidate Name:</strong> [Student Name Placeholder]</p>
+            <p><strong>USN / Roll Number:</strong> [USN / Roll Number Placeholder]</p>
+            <p><strong>Department:</strong> Department of Computer Science & Engineering</p>
+            <p><strong>Institution:</strong> [Institution / University Name Placeholder]</p>
+            <p><strong>Course / Subject:</strong> Advanced Java Programming & Machine Learning</p>
+            <p><strong>Faculty Mentor:</strong> [Faculty Guide Name Placeholder]</p>
+            <p><strong>Academic Year:</strong> 2026 &ndash; 2027</p>
+        </div>
+    </div>
+
+    <!-- 2. ABSTRACT -->
+    <h2>2. Abstract</h2>
+    <p>
+        Outpatient appointment no-shows represent a pervasive and costly operational problem in modern healthcare management, leaving clinical personnel idle, lengthening waiting lists, and delaying patient treatment. Conventional clinic administration approaches either rely on uniform, undifferentiated SMS reminders or unsystematic front-desk follow-up calls. This project presents <strong>ClinicFlow</strong>, a desktop-grade clinical appointment and smart queue management system engineered in Java 17 that natively integrates an embedded Machine Learning engine using Weka 3.8.6. The predictive model is trained and rigorously evaluated on the genuine, public Medical Appointment No-Shows dataset comprising 110,527 historical records from the public healthcare network (SUS) of Vit&oacute;ria, Brazil.
+    </p>
+    <p>
+        To prevent temporal data leakage, an 80:20 chronological train/test split was instituted, yielding 88,417 training instances and 22,104 untouched test instances. A Class-Balanced Random Forest classifier (100 decision trees) was selected following empirical benchmarking against a naive ZeroR majority-class baseline. On the held-out test partition, the model achieves an overall accuracy of <strong>77.50%</strong>, a no-show recall of <strong>32.93%</strong> (successfully detecting 867 missed appointments that a naive baseline misses entirely), a precision of <strong>21.28%</strong>, an F1-score of <strong>0.2585</strong>, and an area under the ROC curve (ROC-AUC) of <strong>0.6658</strong>. 
+    </p>
+    <p>
+        The system features a multi-threaded Java Swing user interface powered by <code>SwingWorker</code> for non-blocking model loading, atomic CSV persistence, an advisory risk-tiering system (Low, Medium, High) recommending proportional reminder actions (automated SMS, enhanced SMS, phone outreach), and a fair First-In, First-Out (FIFO) queue management engine where ML risk is strictly non-punitive. Crucial clinical limitations, including Brazilian-to-Indian healthcare domain shift and observation right-censoring, are systematically audited and documented.
+    </p>
+
+    <!-- 3. INTRODUCTION -->
+    <h2>3. Introduction</h2>
+    <p>
+        Efficient outpatient appointment scheduling is the foundational operational bridge between patient demand and medical provider capacity. Missed consultations ("no-shows") occur when patients fail to attend pre-scheduled visits without notifying the facility in advance. This absenteeism leaves expensive clinical examination rooms and physician time completely unutilized while other patients experience extended waiting times. 
+    </p>
+    <p>
+        Traditional appointment management relies on static reminders that treat all appointments identically. However, patient attendance behavior is multifactorial, depending heavily on scheduling lead time, patient age, chronic illnesses, and booking circumstances. By incorporating predictive Machine Learning directly into the Java-based appointment booking workflow, front-desk staff can obtain real-time, data-driven decision support to prioritize high-risk appointments for proactive outreach.
+    </p>
+
+    <!-- 4. PROBLEM STATEMENT -->
+    <h2>4. Problem Statement</h2>
+    <p>
+        Outpatient healthcare facilities experience substantial capacity waste and revenue loss due to unannounced patient appointment no-shows. Clinic receptionists lack quantitative, automated tools at the time of appointment registration to distinguish between reliable bookings and those with a high likelihood of absence. Without risk-stratified guidance, clinics cannot target their limited administrative follow-up resources effectively, resulting in preventable slot abandonment, prolonged community waiting queues, and poor patient health outcomes.
+    </p>
+
+    <!-- 5. OBJECTIVES -->
+    <h2>5. Project Objectives</h2>
+    <ul>
+        <li><strong>Patient Management:</strong> Implement comprehensive CRUD operations for patient master records, including demographic data, contact information, and chronic condition indicators (hypertension, diabetes, handicap).</li>
+        <li><strong>Doctor Management:</strong> Maintain a directory of active clinic doctors, medical specialties, assigned examination rooms, and active availability status.</li>
+        <li><strong>Intelligent Scheduling:</strong> Provide calendar validation, duplicate reservation prevention, automatic lead-time computation, and sequential queue token generation (<code>Q-###</code>).</li>
+        <li><strong>Native ML Integration:</strong> Embed a trained Weka Random Forest classifier within the Java application to calculate real-time attendance and no-show probabilities upon booking.</li>
+        <li><strong>Operational Risk Stratification:</strong> Translate model probabilities into three actionable risk categories: Low (&lt;20% no-show risk), Medium (20%&ndash;50%), and High (&gt;50%), recommending appropriate reminder workflows.</li>
+        <li><strong>Fair Smart Queue Management:</strong> Implement a digital waiting room adhering to strict First-In, First-Out (FIFO) arrival ordering, guaranteeing that ML predictions never demote or deny service to patients.</li>
+        <li><strong>Reminder Simulation:</strong> Provide a simulated communications console logging SMS and phone outreach transactions with persistent audit trails.</li>
+        <li><strong>Persistent CSV Storage:</strong> Implement thread-safe, atomic file replacement for clinic entities and prediction metadata without external database server overhead.</li>
+        <li><strong>Transparency & Compliance:</strong> Provide an interactive ML Insights dashboard displaying model specifications, confusion matrices, comparative metrics, and academic documentation.</li>
+    </ul>
+
+    <!-- 6. EXISTING SYSTEMS -->
+    <h2>6. Existing Systems and Limitations</h2>
+    <table>
+        <tr>
+            <th>Approach</th>
+            <th>Operational Description</th>
+            <th>Primary Limitations</th>
+        </tr>
+        <tr>
+            <td><strong>Manual Paper / Excel</strong></td>
+            <td>Staff record bookings in physical logbooks or standalone spreadsheets.</td>
+            <td>Prone to duplicate bookings; zero predictive ability; follow-up calls are haphazard and unprioritized.</td>
+        </tr>
+        <tr>
+            <td><strong>Basic Rule-Based EHRs</strong></td>
+            <td>Software triggers automated SMS based on rigid rules (e.g., all bookings &gt; 10 days out).</td>
+            <td>Ignores complex non-linear attribute interactions (e.g., age vs. lead time); causes excessive communication overhead.</td>
+        </tr>
+        <tr>
+            <td><strong>Isolated Python Scripts</strong></td>
+            <td>Machine Learning models trained and tested in separate Jupyter notebooks or Python files.</td>
+            <td>Disconnected from operational clinic software; reception staff cannot execute Python scripts during live patient calls.</td>
+        </tr>
+    </table>
+
+    <!-- 7. PROPOSED SYSTEM -->
+    <h2>7. Proposed System: ClinicFlow</h2>
+    <p>
+        ClinicFlow unifies clinical appointment operations and predictive data science into a single, cohesive Java 17 desktop software suite. By embedding Weka 3.8.6 directly within the application JVM, the system evaluates ML inference vectors synchronously upon appointment booking.
+    </p>
+    <div class="callout">
+        <strong>Core Ethical Operating Principle:</strong> Machine Learning predictions within ClinicFlow are strictly <em>advisory</em>. Predictions serve exclusively to guide staff in proactive reminder communications (e.g., placing a courtesy phone call to high-risk bookings). Model predictions <strong>never</strong> cancel appointments, alter physician availability, or affect patient queue sequencing in the waiting room.
+    </div>
+
+    <!-- 8. DATASET DESCRIPTION -->
+    <h2>8. Dataset Description</h2>
+    <p>
+        The system is trained and evaluated using the genuine, publicly verified <strong>Medical Appointment No-Shows</strong> dataset:
+    </p>
+    <ul>
+        <li><strong>Kaggle Attribution:</strong> Joni Hoppen, <em>Medical Appointment No Shows</em>.</li>
+        <li><strong>Public Source:</strong> Kaggle / Verified Public GitHub Mirror.</li>
+        <li><strong>Healthcare Origin:</strong> Municipal public healthcare system (SUS) of Vit&oacute;ria, Esp&iacute;rito Santo, Brazil.</li>
+        <li><strong>Collection Window:</strong> Appointments scheduled between April 29, 2016 and June 8, 2016.</li>
+        <li><strong>Original Raw Records:</strong> 110,527 rows across 14 columns.</li>
+        <li><strong>Class Ratio:</strong> 88,208 Attended (79.81%) vs. 22,319 Missed (20.19%) &mdash; an approximate 4:1 class imbalance.</li>
+    </ul>
+
+    <!-- 9. PREPROCESSING -->
+    <h2>9. Data Preprocessing & Anomaly Pruning</h2>
+    <p>
+        Raw CSV data was parsed and validated using Apache Commons CSV in <code>DataPreprocessor.java</code>. The original file (<code>data/raw/appointments.csv</code>) is preserved untouched. Exactly <strong>6 anomaly records</strong> (0.0054%) were identified and pruned:
+    </p>
+    <ul>
+        <li><strong>5 Negative Lead-Time Records:</strong> Appointments where the scheduled consultation date preceded the registration date (e.g., scheduled on May 10 for May 09). Chronologically invalid.</li>
+        <li><strong>1 Biologically Impossible Age Record:</strong> Exactly one record had an age of -1.</li>
+    </ul>
+    <p>
+        The remaining <strong>110,521 valid records</strong> were exported to <code>data/processed/clean_appointments.csv</code> with zero synthetic imputation.
+    </p>
+
+    <!-- 10. ML ALGORITHM -->
+    <h2>10. Machine Learning Algorithm Selection</h2>
+    <p>
+        <strong>Random Forest Classification</strong> was selected for its proven efficacy on heterogeneous tabular healthcare data. The algorithm constructs an ensemble of 100 de-correlated decision trees using Bootstrap Aggregation (Bagging) and random feature subspace sampling. Individual trees output class probability distributions, and the ensemble computes the arithmetic mean probability via soft voting:
+    </p>
+    <pre>p(No-Show | x) = (1 / 100) * &Sigma; p_tree(No-Show | x)</pre>
+    <p>
+        To counteract the 4:1 class imbalance, Weka's <code>FilteredClassifier</code> was paired with <code>ClassBalancer</code>, weighting training instances inversely proportional to their class frequency to ensure strong no-show sensitivity.
+    </p>
+
+    <!-- 11. FEATURE SELECTION -->
+    <h2>11. Feature Selection & Data Leakage Prevention</h2>
+    <table>
+        <tr>
+            <th>Index</th>
+            <th>Feature Name</th>
+            <th>Weka Type</th>
+            <th>Operational Justification</th>
+        </tr>
+        <tr>
+            <td>0</td>
+            <td><code>leadTimeDays</code></td>
+            <td>Numeric</td>
+            <td>Days between booking date and appointment date. Strongest predictor of attendance.</td>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td><code>appointmentWeekday</code></td>
+            <td>Nominal</td>
+            <td>Day of week of appointment (Monday..Saturday). Captures weekly absenteeism patterns.</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td><code>bookingWeekday</code></td>
+            <td>Nominal</td>
+            <td>Day of week when appointment was scheduled.</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td><code>bookingHour</code></td>
+            <td>Numeric</td>
+            <td>Hour of day (6..21) when appointment was booked.</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td><code>sameDayBooking</code></td>
+            <td>Nominal</td>
+            <td>Binary (YES/NO). Same-day appointments show &lt;5% historical no-show rate.</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td><code>age</code></td>
+            <td>Numeric</td>
+            <td>Patient age in years. Captures behavioral differences across demographic life stages.</td>
+        </tr>
+    </table>
+    <div class="callout">
+        <strong>Critical Leakage Audit:</strong> Primary keys (<code>PatientId</code>, <code>AppointmentID</code>) were excluded to prevent memorization. Most importantly, <code>SMS_received</code> was strictly excluded from booking-time inference because SMS reminders are dispatched days <em>after</em> the appointment is booked. Using it at booking time would constitute severe temporal data leakage.
+    </div>
+
+    <!-- 12. METHODOLOGY -->
+    <h2>12. Training & Testing Methodology</h2>
+    <p>
+        The dataset was sorted strictly chronologically by <code>ScheduledDay</code> to model authentic real-world deployment:
+    </p>
+    <ul>
+        <li><strong>Training Partition (Earliest 80%):</strong> 88,417 records (Nov 2015 to May 25, 2016 08:47:31).</li>
+        <li><strong>Testing Partition (Latest 20%):</strong> 22,104 records (May 25, 2016 08:47:32 to June 08, 2016).</li>
+    </ul>
+    <p>
+        <strong>Right-Censoring Investigation:</strong> The test set exhibits a lower no-show rate (11.91%) than the training set (22.26%). An audit revealed that this is an observational right-censoring artifact of the 40-day Kaggle collection window: because data collection ended June 8, patients booking after May 25 with lead times &gt; 14 days were cut off. This caused same-day bookings (which have very low no-show rates) to jump from 28.8% in training to 59.1% in testing, mathematically lowering the test set no-show rate.
+    </p>
+
+    <!-- 13. EVALUATION METRICS -->
+    <h2>13. Evaluation Metrics & Comparative Results</h2>
+    <p>
+        Evaluated on the 22,104 untouched test records (Positive Class = <code>YES</code> / No-Show):
+    </p>
+    <table>
+        <tr>
+            <th>Model / Strategy</th>
+            <th>Accuracy</th>
+            <th>Precision (YES)</th>
+            <th>Recall (YES)</th>
+            <th>F1-Score (YES)</th>
+            <th>ROC-AUC</th>
+        </tr>
+        <tr>
+            <td><strong>ZeroR (Naive Majority Baseline)</strong></td>
+            <td><strong>88.09%</strong></td>
+            <td>0.0000</td>
+            <td>0.0000</td>
+            <td>0.0000</td>
+            <td>0.5000</td>
+        </tr>
+        <tr>
+            <td><strong>Standard Random Forest</strong></td>
+            <td>84.34%</td>
+            <td><strong>0.2432</strong></td>
+            <td>0.1489</td>
+            <td>0.1847</td>
+            <td><strong>0.6660</strong></td>
+        </tr>
+        <tr>
+            <td><strong>Balanced Random Forest (Selected)</strong></td>
+            <td>77.50%</td>
+            <td>0.2128</td>
+            <td><strong>0.3293</strong></td>
+            <td><strong>0.2585</strong></td>
+            <td>0.6658</td>
+        </tr>
+    </table>
+
+    <h3>Authoritative Test Confusion Matrix</h3>
+    <table>
+        <tr>
+            <th>Actual \ Predicted</th>
+            <th>Predicted Attended (NO)</th>
+            <th>Predicted No-Show (YES)</th>
+            <th>Total Actual</th>
+        </tr>
+        <tr>
+            <td><strong>Actual Attended (NO)</strong></td>
+            <td><strong>16,264</strong> (True Negatives)</td>
+            <td><strong>3,207</strong> (False Positives)</td>
+            <td>19,471</td>
+        </tr>
+        <tr>
+            <td><strong>Actual No-Show (YES)</strong></td>
+            <td><strong>1,766</strong> (False Negatives)</td>
+            <td><strong>867</strong> (True Positives)</td>
+            <td>2,633</td>
+        </tr>
+        <tr>
+            <td><strong>Total Predicted</strong></td>
+            <td>18,030</td>
+            <td>4,074</td>
+            <td><strong>22,104</strong></td>
+        </tr>
+    </table>
+    <p>
+        <em>Clinical Value:</em> While ZeroR has a higher nominal accuracy (88.09%), it captures 0 no-shows. Balanced Random Forest captures <strong>867 missed appointments</strong> (32.93% recall), providing substantial operational value where the cost of a missed slot far exceeds the cost of a courtesy reminder phone call.
+    </p>
+
+    <!-- 14. SYSTEM ARCHITECTURE -->
+    <h2>14. System Architecture</h2>
+    <p>
+        ClinicFlow is organized into a clean 5-tier Object-Oriented architecture:
+    </p>
+    <ol>
+        <li><strong>Presentation Layer:</strong> Java Swing UI components (<code>ClinicFlowApp</code>, <code>DashboardPanel</code>, <code>AppointmentBookingDialog</code>, <code>QueueManagementPanel</code>, etc.).</li>
+        <li><strong>Service Layer:</strong> Coordinates clinical operations (<code>AppointmentService</code>, <code>PatientService</code>, <code>DoctorService</code>, <code>ReminderService</code>, <code>WekaNoShowPredictionService</code>).</li>
+        <li><strong>Domain Model:</strong> Rich OOP entities (<code>Person</code>, <code>Patient</code>, <code>Doctor</code>, <code>Appointment</code>, <code>PredictionResult</code>, <code>ReminderRecord</code>).</li>
+        <li><strong>Repository Layer:</strong> Decoupled repository interfaces implemented with thread-safe atomic CSV file swapping (<code>CsvPatientRepository</code>, <code>CsvAppointmentRepository</code>).</li>
+        <li><strong>ML Engine:</strong> Embedded Weka 3.8.6 pipeline (<code>DataPreprocessor</code>, <code>FeatureExtractor</code>, <code>NoShowPredictor</code>, <code>ModelRepository</code>).</li>
+    </ol>
+
+    <!-- 15. JAVA OOP CONCEPTS -->
+    <h2>15. Java Programming Concepts Demonstrated</h2>
+    <table>
+        <tr>
+            <th>#</th>
+            <th>Java Concept</th>
+            <th>Exemplary Project Class</th>
+            <th>Implementation Details</th>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td><strong>Classes & Objects</strong></td>
+            <td><code>Appointment.java</code></td>
+            <td>Encapsulates booking timestamps, patient/physician references, tokens, and prediction states.</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td><strong>Constructors</strong></td>
+            <td><code>Patient.java</code></td>
+            <td>Overloaded constructors enforcing non-null constraints, age limits, and health flags.</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td><strong>Encapsulation</strong></td>
+            <td><code>PredictionResult.java</code></td>
+            <td>Immutable private final fields ensuring ML probability scores cannot be tampered with.</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td><strong>Inheritance</strong></td>
+            <td><code>Person.java</code> &rarr; <code>Patient</code>, <code>Doctor</code></td>
+            <td>Abstract parent class sharing demographic fields (ID, name, gender, age) with specialized subclasses.</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td><strong>Interfaces</strong></td>
+            <td><code>Repository.java</code>, <code>NoShowPredictionService.java</code></td>
+            <td>Generic interface contracts decoupling storage and prediction services from UI controllers.</td>
+        </tr>
+        <tr>
+            <td>6</td>
+            <td><strong>Polymorphism</strong></td>
+            <td><code>CsvPatientRepository</code> vs <code>InMemoryPatientRepository</code></td>
+            <td>Interchangeable repository implementations used seamlessly during unit testing and runtime persistence.</td>
+        </tr>
+        <tr>
+            <td>7</td>
+            <td><strong>Collections Framework</strong></td>
+            <td><code>InMemoryDoctorRepository.java</code></td>
+            <td>Extensive usage of <code>ConcurrentHashMap</code>, <code>ArrayList</code>, <code>LinkedHashMap</code>, and Java Streams.</td>
+        </tr>
+        <tr>
+            <td>8</td>
+            <td><strong>Exception Handling</strong></td>
+            <td><code>ClinicFlowException</code> hierarchy</td>
+            <td>Custom domain exceptions (<code>ValidationException</code>, <code>DuplicateEntityException</code>) with graceful UI handling.</td>
+        </tr>
+        <tr>
+            <td>9</td>
+            <td><strong>File Handling (I/O)</strong></td>
+            <td><code>CsvAppointmentRepository.java</code></td>
+            <td>Atomic temporary-file swapping (<code>.tmp</code> &rarr; atomic move) preventing CSV file corruption.</td>
+        </tr>
+        <tr>
+            <td>10</td>
+            <td><strong>Java Date/Time API</strong></td>
+            <td><code>AppointmentService.java</code></td>
+            <td>Modern <code>java.time</code> classes (<code>LocalDate</code>, <code>LocalDateTime</code>, <code>ChronoUnit</code>) for lead-time arithmetic.</td>
+        </tr>
+        <tr>
+            <td>11</td>
+            <td><strong>Event Handling</strong></td>
+            <td><code>AppointmentBookingDialog.java</code></td>
+            <td>ActionListeners and ItemListeners triggering live ML prediction updates upon user selection changes.</td>
+        </tr>
+        <tr>
+            <td>12</td>
+            <td><strong>Concurrency & SwingWorker</strong></td>
+            <td><code>ClinicFlowApp.java</code></td>
+            <td>Background loading of the 233.9 MB Weka model on a worker thread, preventing UI freezing.</td>
+        </tr>
+    </table>
+
+    <!-- 16. ML INTEGRATION -->
+    <h2>16. Machine Learning and Java Integration</h2>
+    <p>
+        The complete Machine Learning lifecycle runs natively within the JVM. Historical training records are ingested via Java CSV parsers, filtered via Weka Java APIs, serialized using Weka's native <code>SerializationHelper</code>, and deserialized into memory at application boot. At booking time, <code>Appointment</code> entities are mapped to Weka <code>DenseInstance</code> objects and evaluated in sub-millisecond time.
+    </p>
+
+    <!-- 17. APPLICATION SCREENSHOTS -->
+    <h2>17. Application Screen Walkthroughs</h2>
+    <div class="callout">
+        <strong>Graphical Verification Note:</strong> ClinicFlow features 8 core functional screens developed in Java Swing. Screenshots can be captured during live demonstration using the Windows shortcut <code>Win + Shift + S</code> when running <code>run-clinicflow.bat</code>.
+    </div>
+    <ul>
+        <li><strong>Dashboard:</strong> 4 KPI metric cards, today's schedule table, and custom Java2D attendance breakdown bar chart.</li>
+        <li><strong>Patient Management:</strong> Patient table, instant substring search, registration modal, history drawer, and deletion protection.</li>
+        <li><strong>Doctor Management:</strong> Physician directory, availability toggle (Available / On Leave), and deletion guards.</li>
+        <li><strong>Appointment Booking:</strong> Date/time picker, duplicate booking validator, and live ML risk assessment preview.</li>
+        <li><strong>Appointment Management:</strong> 7 filter tabs (All, Today, Upcoming, High-Risk, Completed, Cancelled, Missed) and lifecycle actions.</li>
+        <li><strong>Smart Queue:</strong> Digital waiting room with strict arrival-time FIFO ordering and consultation progression.</li>
+        <li><strong>Reminder Management:</strong> Proactive dispatch console with single and batch simulation and persistent CSV delivery logs.</li>
+        <li><strong>ML Model Insights:</strong> Weka model specifications, ZeroR vs RF comparison table, confusion matrix, student explanation, and clinical warning badge.</li>
+    </ul>
+
+    <!-- 18. SAMPLE INPUTS AND OUTPUTS -->
+    <h2>18. Sample Inputs and Outputs</h2>
+    <h3>A. Genuine Test Prediction Example (Appointment #5736789)</h3>
+    <pre>Patient Age: 31 | Lead Time: 6 days | Same-Day: NO
+Estimated Attendance Probability: 26.15% | Estimated No-Show Probability: 73.85%
+Model Classification: YES (No-Show) | Risk Category: HIGH | Suggested Action: PHONE_CALL</pre>
+
+    <h3>B. Live Application Booking Demonstration</h3>
+    <pre>Input: Patient ID 1001 (Maria Santos), Doctor ID 201 (Dr. Beatriz Silva), Date: Today + 5 Days, Time: 10:30 AM
+System Output: Queue Token Q-001 issued | Lead Time: 5 days | ML Risk: 56.58% (HIGH) | Action: Dedicated Phone Call
+Lifecycle Output: Check-In -> Waiting Room Queue -> In Consultation -> Completed (ATTENDED)</pre>
+
+    <!-- 19. RESULTS AND DISCUSSION -->
+    <h2>19. Results and Discussion</h2>
+    <p>
+        All <strong>41 automated unit and integration tests</strong> pass with zero failures and zero errors. The application packages cleanly into an executable JAR (<code>target/clinicflow-1.0.0-SNAPSHOT.jar</code>) with all runtime dependencies copied to <code>target/lib/</code>. Model deserialization requires approximately 4.8 seconds on standard SSDs and executes seamlessly in the background without degrading UI responsiveness.
+    </p>
+
+    <!-- 20. LIMITATIONS -->
+    <h2>20. Practical Limitations</h2>
+    <ul>
+        <li><strong>Domain Shift:</strong> Model trained on 2016 Brazilian SUS public clinics; attendance dynamics in Indian private healthcare will differ.</li>
+        <li><strong>Dataset Right-Censoring:</strong> Fixed 40-day collection window truncates test set lead times.</li>
+        <li><strong>Uncalibrated Probabilities:</strong> Soft voting percentages approximate but do not represent formally calibrated probabilities.</li>
+        <li><strong>Moderate Precision:</strong> A 21.28% precision means reminder phone calls must be conducted as polite courtesy inquiries.</li>
+        <li><strong>Simulated Communications:</strong> SMS and telephony are simulated locally and logged to CSV rather than using paid external gateways.</li>
+        <li><strong>Storage Concurrency:</strong> CSV storage is optimized for single-clinic reception desks rather than multi-hospital networks.</li>
+    </ul>
+
+    <!-- 21. FUTURE WORK -->
+    <h2>21. Future Enhancements</h2>
+    <ul>
+        <li>Retraining on localized Indian hospital and primary health center appointment datasets.</li>
+        <li>Adding Platt scaling or isotonic regression probability calibration.</li>
+        <li>Incorporating local weather forecasts and regional festival calendars into feature extraction.</li>
+        <li>Providing an enterprise RDBMS (PostgreSQL) repository layer.</li>
+        <li>Integrating live cloud SMS and WhatsApp Business APIs.</li>
+    </ul>
+
+    <!-- 22. CONCLUSION -->
+    <h2>22. Conclusion</h2>
+    <p>
+        ClinicFlow successfully demonstrates the practical convergence of Object-Oriented Software Engineering in Java 17 and native Machine Learning using Weka 3.8.6. By grounding model training in a genuine dataset of 110,527 records and evaluating strictly on an untouched chronological test partition, the system achieves a genuine 32.93% no-show recall without inflated claims. Combining proactive advisory risk stratification with strict FIFO queue fairness, ClinicFlow satisfies all academic and practical requirements.
+    </p>
+
+    <!-- 23. REFERENCES -->
+    <h2>23. References</h2>
+    <ol>
+        <li>Hoppen, J. (2016). <em>Medical Appointment No Shows</em>. Kaggle. <code>https://www.kaggle.com/datasets/joniarroba/noshowappointments/data</code></li>
+        <li>Breiman, L. (2001). <em>Random Forests</em>. Machine Learning, 45(1), 5&ndash;32.</li>
+        <li>Frank, E., Hall, M. A., & Witten, I. H. (2016). <em>The WEKA Workbench</em>. Morgan Kaufmann, 4th Edition.</li>
+        <li>Oracle Corporation. (2021). <em>Java Platform, Standard Edition Documentation, Version 17 LTS</em>. <code>https://docs.oracle.com/en/java/javase/17/</code></li>
+        <li>Apache Software Foundation. (2024). <em>Apache Commons CSV Component, Version 1.10.0</em>. <code>https://commons.apache.org/proper/commons-csv/</code></li>
+        <li>He, H., & Garcia, E. A. (2009). <em>Learning from Imbalanced Data</em>. IEEE Transactions on Knowledge and Data Engineering, 21(9), 1263&ndash;1284.</li>
+    </ol>
+
+</div>
+
+</body>
+</html>
