@@ -1,0 +1,6 @@
+ReminderId,AppointmentId,PatientName,PatientContact,AppointmentDate,AppointmentTime,DoctorName,RiskCategory,RecommendedAction,Status,SentTimestamp,Notes
+101,5001,Maria Santos,+55-27-99123-4567,2026-11-24,09:30,Dr. Beatriz Silva,LOW,STANDARD,SENT,2026-11-23T10:07:14.958443,Simulated STANDARD recorded at 2026-11-23T10:07:14.958443
+102,5002,Joao Batista,+55-27-99456-7890,2026-11-24,11:30,Dr. Beatriz Silva,MEDIUM,ENHANCED_SMS,SENT,2026-11-23T10:07:14.9624284,Simulated ENHANCED_SMS recorded at 2026-11-23T10:07:14.962428400
+103,5003,Joao Batista,+55-27-99456-7890,2026-11-24,13:30,Dr. Beatriz Silva,MEDIUM,ENHANCED_SMS,SENT,2026-11-23T10:12:32.4763642,Simulated ENHANCED_SMS recorded at 2026-11-23T10:12:32.476364200
+104,5004,Carlos Oliveira,+55-27-99234-5678,2026-11-23,11:00,Dr. Beatriz Silva,MEDIUM,ENHANCED_SMS,SENT,2026-11-23T10:17:44.2357901,Simulated ENHANCED_SMS recorded at 2026-11-23T10:17:44.235790100
+105,5005,K Kalash,123456789,2026-11-23,09:30,Dr. Ricardo Mendes,LOW,STANDARD,PENDING,,Academic simulation - non-punitive confirmation

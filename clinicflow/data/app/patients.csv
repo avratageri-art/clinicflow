@@ -1,0 +1,7 @@
+PatientId,Name,Gender,Age,ContactNumber,Scholarship,Hipertension,Diabetes,Alcoholism,Handicap
+1001,Maria Santos,F,56,+55-27-99123-4567,false,true,true,false,0
+1002,Carlos Oliveira,M,32,+55-27-99234-5678,false,false,false,false,0
+1003,Ana Paula Lima,F,24,+55-27-99345-6789,true,false,false,false,0
+1004,Joao Batista,M,68,+55-27-99456-7890,false,true,false,false,1
+1005,K Kalash,M,21,123456789,true,true,true,true,0
+1006,Aryan Sahu,M,29,,false,true,false,true,0

@@ -1,0 +1,4 @@
+DoctorId,Name,Gender,Age,Specialty,RoomNumber,ContactNumber,Available
+201,Dr. Beatriz Silva,F,42,Cardiology,Room 201,+55-27-98111-2233,true
+202,Dr. Ricardo Mendes,M,48,General Medicine,Room 105,+55-27-98222-3344,true
+203,Dr. Juliana Costa,F,36,Pediatrics,Room 302,+55-27-98333-4455,true
