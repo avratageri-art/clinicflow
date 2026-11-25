@@ -68,24 +68,31 @@ public class ClinicalAssistantService {
         List<Appointment> todayQueue = appointmentService.getTodayQueue(LocalDate.now());
         List<ReminderRecord> pending = reminderService.getPendingReminders();
 
+        Map<Long, Patient> patientById = patients.stream()
+                .collect(Collectors.toMap(Patient::getId, p -> p, (a, b) -> a));
+        Map<Long, Doctor> doctorById = doctors.stream()
+                .collect(Collectors.toMap(Doctor::getId, d -> d, (a, b) -> a));
+
         Map<String, Object> context = buildClinicContext(patients, doctors, activeAppts, todayQueue, pending);
         Map<String, Object> signals = buildContextSignals(allAppts, activeAppts, todayQueue, pending, doctors);
-        return dispatchIntent(lower, optionalPatientId, patients, doctors, allAppts, activeAppts, todayQueue, pending, context, signals);
+        return dispatchIntent(lower, optionalPatientId, patients, doctors, patientById, doctorById,
+                allAppts, activeAppts, todayQueue, pending, context, signals);
     }
 
     private Map<String, Object> dispatchIntent(String lower, Long optionalPatientId,
                                                List<Patient> patients, List<Doctor> doctors,
+                                               Map<Long, Patient> patientById, Map<Long, Doctor> doctorById,
                                                List<Appointment> allAppts, List<Appointment> activeAppts,
                                                List<Appointment> todayQueue, List<ReminderRecord> pending,
                                                Map<String, Object> context, Map<String, Object> signals) {
-        Optional<Doctor> doc = findMentionedDoctor(doctors, lower);
+        Optional<Doctor> doc = findMentionedDoctor(doctors, doctorById, lower);
         if (doc.isPresent()) {
             return buildSingleDoctorContextResponse(doc.get(), activeAppts, context, signals);
         }
         if (containsAny(lower, "doctor", "overload", "load", "balance", "capacity", "physician")) {
             return buildDoctorLoadResponse(doctors, activeAppts, context, signals);
         }
-        Optional<Patient> pat = findMentionedPatient(patients, lower);
+        Optional<Patient> pat = findMentionedPatient(patients, patientById, lower);
         if (pat.isPresent()) {
             return buildSinglePatientContextResponse(pat.get(), allAppts, pending, doctors, context, signals);
         }
@@ -391,14 +398,24 @@ public class ClinicalAssistantService {
         return a.getPatient() != null ? a.getPatient().getName() : "Unknown";
     }
 
-    private static Optional<Patient> findMentionedPatient(List<Patient> patients, String lowerQuery) {
-        return patients.stream().filter(p -> lowerQuery.contains(String.valueOf(p.getId()))
-                || lowerQuery.contains(p.getName().toLowerCase(Locale.ROOT))).findFirst();
+    private static Optional<Patient> findMentionedPatient(List<Patient> patients, Map<Long, Patient> byId, String lowerQuery) {
+        for (String token : lowerQuery.split("\\s+")) {
+            try {
+                Patient direct = byId.get(Long.parseLong(token.replaceAll("[^0-9]", "")));
+                if (direct != null) return Optional.of(direct);
+            } catch (NumberFormatException ignored) {}
+        }
+        return patients.stream().filter(p -> lowerQuery.contains(p.getName().toLowerCase(Locale.ROOT))).findFirst();
     }
 
-    private static Optional<Doctor> findMentionedDoctor(List<Doctor> doctors, String lowerQuery) {
+    private static Optional<Doctor> findMentionedDoctor(List<Doctor> doctors, Map<Long, Doctor> byId, String lowerQuery) {
+        for (String token : lowerQuery.split("\\s+")) {
+            try {
+                Doctor direct = byId.get(Long.parseLong(token.replaceAll("[^0-9]", "")));
+                if (direct != null) return Optional.of(direct);
+            } catch (NumberFormatException ignored) {}
+        }
         for (Doctor d : doctors) {
-            if (lowerQuery.contains(String.valueOf(d.getId()))) return Optional.of(d);
             for (String token : d.getName().toLowerCase(Locale.ROOT).replace("dr.", "").trim().split("\\s+")) {
                 if (token.length() >= DOCTOR_TOKEN_MIN_LEN && lowerQuery.contains(token)) return Optional.of(d);
             }

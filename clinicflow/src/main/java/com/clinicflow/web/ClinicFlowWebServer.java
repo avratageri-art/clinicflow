@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -58,8 +59,10 @@ public class ClinicFlowWebServer {
     private final WekaNoShowPredictionService predictionService;
     private final NoShowModelTrainer modelTrainer;
     private final WebSecuritySupport security = new WebSecuritySupport();
+    private final byte[] cachedIndexHtml;
 
     private HttpServer server;
+    private ExecutorService executor;
     private int boundPort;
 
     /** Creates a web server using the default {@link ApplicationConfig}. */
@@ -87,7 +90,17 @@ public class ClinicFlowWebServer {
         this.modelInsightsService = new ModelInsightsService(config);
         this.assistantService = new ClinicalAssistantService(patientService, doctorService, appointmentService, reminderService, predictionService);
         this.modelTrainer = new NoShowModelTrainer(new DataPreprocessor(), new ModelEvaluator(), new ModelRepository(), config);
+        this.cachedIndexHtml = loadStaticIndexHtml();
         seedInitialDataIfNeeded();
+    }
+
+    private byte[] loadStaticIndexHtml() {
+        try (InputStream is = getClass().getResourceAsStream("/web/index.html")) {
+            return is != null ? is.readAllBytes() : null;
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Failed to preload /web/index.html", e);
+            return null;
+        }
     }
 
     private void seedInitialDataIfNeeded() {
@@ -108,7 +121,8 @@ public class ClinicFlowWebServer {
     public void start(int port) throws IOException {
         this.server = HttpServer.create(new InetSocketAddress(BIND_HOST, port), 0);
         this.boundPort = server.getAddress().getPort();
-        server.setExecutor(Executors.newFixedThreadPool(EXECUTOR_THREADS));
+        this.executor = Executors.newFixedThreadPool(EXECUTOR_THREADS);
+        server.setExecutor(executor);
         registerRoutes();
         server.start();
         LOGGER.info("ClinicFlow web server listening on http://" + BIND_HOST + ":" + boundPort);
@@ -140,9 +154,10 @@ public class ClinicFlowWebServer {
         }
     }
 
-    /** Stops the HTTP server immediately. */
+    /** Stops the HTTP server and bounded worker pool immediately. */
     public void stop() {
         if (server != null) server.stop(0);
+        if (executor != null) executor.shutdownNow();
     }
 
     /** @return the bound TCP port */
@@ -197,19 +212,16 @@ public class ClinicFlowWebServer {
             security.sendError(ex, 404, "Not found", null);
             return;
         }
-        try (InputStream is = getClass().getResourceAsStream("/web/index.html")) {
-            if (is == null) {
-                security.sendError(ex, 500, "Web UI resource missing", null);
-                return;
-            }
-            byte[] html = is.readAllBytes();
-            security.applySecurityHeaders(ex, false);
-            ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-            ex.getResponseHeaders().set("Content-Security-Policy", CSP_HEADER);
-            ex.sendResponseHeaders(200, html.length);
-            try (OutputStream os = ex.getResponseBody()) {
-                os.write(html);
-            }
+        if (cachedIndexHtml == null) {
+            security.sendError(ex, 500, "Web UI resource missing", null);
+            return;
+        }
+        security.applySecurityHeaders(ex, false);
+        ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+        ex.getResponseHeaders().set("Content-Security-Policy", CSP_HEADER);
+        ex.sendResponseHeaders(200, cachedIndexHtml.length);
+        try (OutputStream os = ex.getResponseBody()) {
+            os.write(cachedIndexHtml);
         }
     }
 

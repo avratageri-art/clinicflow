@@ -273,6 +273,44 @@ class ClinicFlowWebServerTest {
         assertThat(lastStatus).isEqualTo(429);
     }
 
+    @Test
+    @DisplayName("WebSecuritySupport bounds tracked IP buckets at MAX_TRACKED_IPS (2048)")
+    void testRateLimiterMemoryBound() {
+        WebSecuritySupport sec = new WebSecuritySupport();
+        for (int i = 0; i < 2500; i++) {
+            assertThat(sec.allowIp("10.0." + (i / 255) + "." + (i % 255))).isTrue();
+        }
+        assertThat(sec.getTrackedIpCount()).isLessThanOrEqualTo(2048);
+    }
+
+    @Test
+    @DisplayName("Concurrent throughput: 25 parallel /api/predict and /api/assistant/query calls succeed cleanly")
+    void testConcurrentPredictionAndAssistantThroughput() throws Exception {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(8);
+        try {
+            java.util.List<java.util.concurrent.CompletableFuture<Integer>> futures = new java.util.ArrayList<>();
+            String futureDate = LocalDate.now().plusDays(5).toString();
+            for (int i = 0; i < 25; i++) {
+                final int idx = i;
+                futures.add(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                    try {
+                        HttpResponse<String> r = (idx % 2 == 0)
+                                ? post("/api/predict", "{\"age\":35,\"gender\":\"F\",\"appointmentDay\":\"" + futureDate + "\"}")
+                                : post("/api/assistant/query", "{\"query\":\"Give me today's clinic briefing\"}");
+                        return r.statusCode();
+                    } catch (Exception e) {
+                        return 500;
+                    }
+                }, pool));
+            }
+            for (java.util.concurrent.CompletableFuture<Integer> f : futures) {
+                assertThat(f.get()).isEqualTo(200);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     private HttpResponse<String> post(String path, String jsonBody) throws Exception {
         HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + path))
                 .header("Content-Type", "application/json")

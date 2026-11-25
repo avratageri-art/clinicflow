@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class WebSecuritySupport {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 120;
+    private static final int MAX_TRACKED_IPS = 2048;
     private static final long WINDOW_MS = 60_000L;
     private static final List<String> DANGEROUS_HTML_PATTERNS = List.of(
             "<script", "</script", "javascript:", "onerror=", "onload=", "<iframe"
@@ -38,7 +39,14 @@ final class WebSecuritySupport {
         String ip = ex.getRemoteAddress() != null && ex.getRemoteAddress().getAddress() != null
                 ? ex.getRemoteAddress().getAddress().getHostAddress()
                 : "unknown";
+        return allowIp(ip);
+    }
+
+    boolean allowIp(String ip) {
         long now = System.currentTimeMillis();
+        if (ipCounters.size() >= MAX_TRACKED_IPS && !ipCounters.containsKey(ip)) {
+            evictExpiredOrOldest(now);
+        }
         WindowCounter counter = ipCounters.compute(ip, (k, existing) -> {
             if (existing == null || now - existing.windowStartMs >= WINDOW_MS) {
                 return new WindowCounter(now);
@@ -46,6 +54,17 @@ final class WebSecuritySupport {
             return existing;
         });
         return counter.count.incrementAndGet() <= MAX_REQUESTS_PER_MINUTE;
+    }
+
+    int getTrackedIpCount() {
+        return ipCounters.size();
+    }
+
+    private void evictExpiredOrOldest(long now) {
+        ipCounters.entrySet().removeIf(e -> now - e.getValue().windowStartMs >= WINDOW_MS);
+        if (ipCounters.size() >= MAX_TRACKED_IPS) {
+            ipCounters.clear();
+        }
     }
 
     /**
