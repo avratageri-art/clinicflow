@@ -169,7 +169,7 @@ class ClinicFlowWebServerTest {
         // 5. Smart Clinical Assistant context-aware queries across all intents
         HttpResponse<String> briefResp = post("/api/assistant/query", "{\"query\":\"Give me today's clinic briefing\"}");
         assertThat(briefResp.statusCode()).isEqualTo(200);
-        assertThat(briefResp.body()).contains("CLINIC_BRIEFING", "reasoningSteps", "clinicContext");
+        assertThat(briefResp.body()).contains("CLINIC_BRIEFING", "reasoningSteps", "clinicContext", "contextSignals", "unremindedHighRiskCount", "busiestDoctor");
 
         HttpResponse<String> riskResp = post("/api/assistant/query", "{\"query\":\"Who are my highest-risk patients?\"}");
         assertThat(riskResp.statusCode()).isEqualTo(200);

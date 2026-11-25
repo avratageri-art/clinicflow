@@ -248,7 +248,9 @@
           <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Generate today\'s reminder action plan')">Reminder Action Plan</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Suggest optimal low-risk slots')">Optimal Low-Risk Slots</button>
         </div>
+        <div id="assistant-signals" style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.6rem;" aria-live="polite"></div>
         <div id="assistant-output" class="alert" role="status" aria-live="polite">Loading live clinic briefing...</div>
+        <div id="assistant-history" style="margin-top:0.5rem; font-size:0.84rem; color:var(--muted);"></div>
       </div>
 
       <div class="card">
@@ -565,8 +567,12 @@
       if (q) await askAssistant(q);
     }
 
+    const assistantHistory = [];
+
     async function askAssistant(query) {
       const box = document.getElementById('assistant-output');
+      const sigBox = document.getElementById('assistant-signals');
+      const histBox = document.getElementById('assistant-history');
       document.getElementById('assistant-query').value = query;
       try {
         const res = await api('/api/assistant/query', {
@@ -574,6 +580,16 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query })
         });
+        if (res.contextSignals) {
+          const s = res.contextSignals;
+          sigBox.innerHTML = [
+            `Appts: ${s.totalAppointments}`,
+            `High-Risk: ${s.highRiskCount}`,
+            `Unreminded High-Risk: ${s.unremindedHighRiskCount}`,
+            `Queue Depth: ${s.activeQueueDepth}`,
+            `Busiest: ${s.busiestDoctor} (${s.busiestDoctorLoad})`
+          ].map(t => `<span class="badge" style="background:#e2e8f0;color:#0f172a;">${t}</span>`).join('');
+        }
         const steps = (res.reasoningSteps || []).map(s => `<li>${s}</li>`).join('');
         const actions = (res.recommendedActions || []).map(a => {
           let btn = '';
@@ -581,6 +597,8 @@
             const act = a.oneClickAction;
             if (act.type === 'SEND_REMINDER') {
               btn = ` <button type="button" class="btn btn-sm" onclick="sendReminder(${act.reminderId})">${act.label}</button>`;
+            } else if (act.type === 'CHECK_IN') {
+              btn = ` <button type="button" class="btn btn-sm" onclick="queueAction('checkin', ${act.appointmentId})">${act.label}</button>`;
             } else if (act.type === 'APPLY_SLOT') {
               btn = ` <button type="button" class="btn btn-sm" onclick="applyBookingSlot('${act.date}','${act.time}')">${act.label}</button>`;
             }
@@ -590,6 +608,9 @@
         box.innerHTML = `<strong>Intent:</strong> ${res.intent} &mdash; <strong>${res.answer}</strong>` +
           (steps ? `<ul style="margin:0.4rem 0 0.4rem 1.2rem;">${steps}</ul>` : '') +
           (actions ? `<div style="margin-top:0.35rem;"><strong>Recommended Actions:</strong><ul style="margin:0.25rem 0 0 1.2rem;">${actions}</ul></div>` : '');
+        assistantHistory.unshift(`<strong>Q:</strong> ${query} &rarr; <em>${res.intent}</em>`);
+        if (assistantHistory.length > 4) assistantHistory.pop();
+        histBox.innerHTML = assistantHistory.length > 1 ? `<strong>Recent Turns:</strong> ` + assistantHistory.slice(1).join(' | ') : '';
       } catch (err) {
         box.textContent = 'Assistant error: ' + err.message;
       }

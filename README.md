@@ -53,14 +53,15 @@ Every feature documented here is implemented and wired end-to-end:
 
 | Capability | Backend Class | API Endpoint | Web UI Panel (`index.html`) |
 | :--- | :--- | :--- | :--- |
-| **Smart Clinical Copilot** | `ClinicalAssistantService` | `POST /api/assistant/query` | Overview -> **Smart Clinical Assistant** (auto-briefing, prompt input, 4 quick chips, 1-click actions) |
-| **Live Risk & Slot Simulator** | `WekaNoShowPredictionService`, `AppointmentService` | `POST /api/predict` | Overview -> **Live No-Show Risk & Slot Simulator** (clickable low-risk slot buttons) |
-| **Dashboard KPIs** | `ClinicFlowWebServer` | `GET /api/dashboard` | Overview -> 5 live KPI cards |
-| **Appointments & ML Booking** | `AppointmentService` | `GET / POST /api/appointments` | Appointments -> Book form, triage guidance, table with **Check In** / **Cancel** |
-| **FIFO Clinic Queue** | `AppointmentService` | `GET /api/queue`, `POST /api/queue/{checkin,start,complete,noshow,cancel}` | Clinic Queue (FIFO) -> Check-In, Start, Complete, No-Show |
-| **Patient & Doctor Directory** | `PatientService`, `DoctorService` | `GET / POST /api/patients`, `GET / POST /api/doctors` | Patients & Reminders -> Register Patient & Register Doctor forms |
-| **Reminder Outreach Audit** | `ReminderService` | `GET /api/reminders`, `POST /api/reminders/send` | Patients & Reminders -> Reminder Outreach Queue |
+| **Smart Clinical Copilot** | `ClinicalAssistantService`, `ClinicApiHandlers` | `POST /api/assistant/query` | Overview -> **Smart Clinical Assistant** (auto-briefing, live `contextSignals` badges, recent turns, 1-click actions) |
+| **Live Risk & Slot Simulator** | `WekaNoShowPredictionService`, `AppointmentService`, `ApiResponseMapper` | `POST /api/predict` | Overview -> **Live No-Show Risk & Slot Simulator** (clickable low-risk slot buttons) |
+| **Dashboard KPIs** | `ClinicFlowWebServer`, `ClinicApiHandlers` | `GET /api/dashboard` | Overview -> 5 live KPI cards |
+| **Appointments & ML Booking** | `AppointmentService`, `ClinicApiHandlers` | `GET / POST /api/appointments` | Appointments -> Book form, triage guidance, table with **Check In** / **Cancel** |
+| **FIFO Clinic Queue** | `AppointmentService`, `ClinicApiHandlers` | `GET /api/queue`, `POST /api/queue/{checkin,start,complete,noshow,cancel}` | Clinic Queue (FIFO) -> Check-In, Start, Complete, No-Show |
+| **Patient & Doctor Directory** | `PatientService`, `DoctorService`, `ClinicApiHandlers` | `GET / POST /api/patients`, `GET / POST /api/doctors` | Patients & Reminders -> Register Patient & Register Doctor forms |
+| **Reminder Outreach Audit** | `ReminderService`, `ClinicApiHandlers` | `GET /api/reminders`, `POST /api/reminders/send` | Patients & Reminders -> Reminder Outreach Queue |
 | **ML Insights & Retraining** | `ModelInsightsService`, `NoShowModelTrainer` | `GET /api/model/insights`, `POST /api/model/retrain` | ML Model Insights -> Metrics, features, **Retrain Model** button |
+| **Transport Security** | `WebSecuritySupport`, `CsvSanitizer` | All `/api/*` & `/` | Rate limiting (`429`), `405`/`413` envelopes, `Cache-Control: no-store`, `Permissions-Policy` |
 
 ---
 
