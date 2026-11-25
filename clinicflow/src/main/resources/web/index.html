@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClinicFlow — Smart Hospital Appointment &amp; Queue Assistant</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --border: #d5dfec;
+      --text: #0f172a;
+      --muted: #475569;
+      --primary: #0b5ed7;
+      --primary-dark: #084298;
+      --low-bg: #dcfce7;
+      --low-fg: #14532d;
+      --med-bg: #fef3c7;
+      --med-fg: #78350f;
+      --high-bg: #fee2e2;
+      --high-fg: #7f1d1d;
+      --focus: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: var(--primary);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      z-index: 1000;
+    }
+    .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    header {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    header h1 { margin: 0; font-size: 1.35rem; }
+    header p { margin: 0.15rem 0 0; font-size: 0.9rem; color: #cbd5e1; }
+    .status-pill {
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+    }
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    nav button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      padding: 0.5rem 0.9rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    nav button[aria-selected="true"] {
+      background: var(--primary);
+      color: #ffffff;
+    }
+    nav button:hover:not([aria-selected="true"]) {
+      background: #e2e8f0;
+    }
+    main {
+      max-width: 1200px;
+      margin: 1.25rem auto;
+      padding: 0 1rem 2rem;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .kpi-label { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+    .kpi-value { font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+    input, select {
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      background: #fff;
+      color: var(--text);
+    }
+    .btn {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 0.55rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.92rem;
+    }
+    .btn:hover { background: var(--primary-dark); }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem; }
+    .btn-secondary { background: #334155; }
+    .btn-secondary:hover { background: #1e293b; }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .badge-LOW { background: var(--low-bg); color: var(--low-fg); }
+    .badge-MEDIUM { background: var(--med-bg); color: var(--med-fg); }
+    .badge-HIGH { background: var(--high-bg); color: var(--high-fg); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { background: #f1f5f9; font-weight: 700; }
+    .table-wrap { overflow-x: auto; }
+    .alert {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-top: 0.75rem;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+    }
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header>
+    <div>
+      <h1>ClinicFlow</h1>
+      <p>Smart Patient No-Show Prediction &amp; Clinic Queue Assistant</p>
+    </div>
+    <div class="status-pill" id="model-status" aria-live="polite">Checking ML engine...</div>
+  </header>
+
+  <nav aria-label="Primary navigation" role="tablist">
+    <button type="button" role="tab" aria-selected="true" aria-controls="tab-overview" id="btn-overview" onclick="switchTab('overview')">Overview &amp; Risk Simulator</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-appointments" id="btn-appointments" onclick="switchTab('appointments')">Appointments</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-queue" id="btn-queue" onclick="switchTab('queue')">Clinic Queue (FIFO)</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-patients" id="btn-patients" onclick="switchTab('patients')">Patients &amp; Reminders</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="tab-model" id="btn-model" onclick="switchTab('model')">ML Model Insights</button>
+  </nav>
+
+  <main id="main-content" tabindex="-1">
+    <div id="global-toast" class="alert" role="status" aria-live="polite" style="display:none;"></div>
+
+    <!-- OVERVIEW & SMART RISK SIMULATOR -->
+    <section id="tab-overview" class="panel active" role="tabpanel" aria-labelledby="btn-overview">
+      <div class="grid" id="kpi-grid">
+        <div class="card"><div class="kpi-label">Registered Patients</div><div class="kpi-value" id="kpi-patients">-</div></div>
+        <div class="card"><div class="kpi-label">Total Appointments</div><div class="kpi-value" id="kpi-appts">-</div></div>
+        <div class="card"><div class="kpi-label">Active Today Queue</div><div class="kpi-value" id="kpi-queue">-</div></div>
+        <div class="card"><div class="kpi-label">High-Risk Bookings</div><div class="kpi-value" id="kpi-high">-</div></div>
+        <div class="card"><div class="kpi-label">Pending Reminders</div><div class="kpi-value" id="kpi-reminders">-</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Smart Assistant: Live No-Show Risk &amp; Slot Simulator</h2>
+        <p>Evaluate patient no-show risk in real time using the Weka Random Forest model and receive tailored outreach and lower-risk slot recommendations.</p>
+        <form onsubmit="runPrediction(event)">
+          <div class="form-grid">
+            <div>
+              <label for="sim-age">Patient Age</label>
+              <input id="sim-age" type="number" min="0" max="120" value="32" required />
+            </div>
+            <div>
+              <label for="sim-gender">Gender</label>
+              <select id="sim-gender" aria-label="Patient gender">
+                <option value="F">Female (F)</option>
+                <option value="M">Male (M)</option>
+              </select>
+            </div>
+            <div>
+              <label for="sim-date">Appointment Date</label>
+              <input id="sim-date" type="date" required />
+            </div>
+            <div>
+              <label for="sim-hood">Neighbourhood</label>
+              <input id="sim-hood" type="text" value="JARDIM DA PENHA" required />
+            </div>
+          </div>
+          <button class="btn" type="submit" aria-label="Predict no-show risk">Predict No-Show Risk</button>
+        </form>
+        <div id="sim-result" class="alert" aria-live="polite" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- APPOINTMENTS -->
+    <section id="tab-appointments" class="panel" role="tabpanel" aria-labelledby="btn-appointments">
+      <div class="card" style="margin-bottom:1rem;">
+        <h2>Book New Appointment</h2>
+        <form onsubmit="bookAppointment(event)">
+          <div class="form-grid">
+            <div>
+              <label for="book-patient">Patient</label>
+              <select id="book-patient" required></select>
+            </div>
+            <div>
+              <label for="book-doctor">Attending Doctor</label>
+              <select id="book-doctor" required></select>
+            </div>
+            <div>
+              <label for="book-date">Appointment Date</label>
+              <input id="book-date" type="date" required />
+            </div>
+            <div>
+              <label for="book-time">Time</label>
+              <input id="book-time" type="time" value="09:30" required />
+            </div>
+            <div>
+              <label for="book-hood">Neighbourhood</label>
+              <input id="book-hood" type="text" value="CENTRO" required />
+            </div>
+          </div>
+          <button class="btn" type="submit" aria-label="Book appointment with ML risk check">Book &amp; Predict Risk</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Scheduled Appointments</h2>
+        <div class="table-wrap">
+          <table aria-label="Scheduled appointments">
+            <thead>
+              <tr>
+                <th>Token</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Lead</th><th>No-Show Risk</th><th>Suggested Action</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="appointments-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUEUE -->
+    <section id="tab-queue" class="panel" role="tabpanel" aria-labelledby="btn-queue">
+      <div class="card">
+        <h2>Today's Clinic Queue (Strict FIFO Fairness)</h2>
+        <p>Patients are ordered strictly by check-in arrival and scheduled time. Risk scores never demote patients in the queue.</p>
+        <div class="table-wrap">
+          <table aria-label="Today's clinic queue">
+            <thead>
+              <tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Time</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="queue-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PATIENTS & REMINDERS -->
+    <section id="tab-patients" class="panel" role="tabpanel" aria-labelledby="btn-patients">
+      <div class="card" style="margin-bottom:1rem;">
+        <h2>Register Patient</h2>
+        <form onsubmit="registerPatient(event)">
+          <div class="form-grid">
+            <div><label for="pat-name">Full Name</label><input id="pat-name" type="text" required /></div>
+            <div><label for="pat-gender">Gender</label><select id="pat-gender"><option value="F">F</option><option value="M">M</option></select></div>
+            <div><label for="pat-age">Age</label><input id="pat-age" type="number" min="0" max="125" value="30" required /></div>
+            <div><label for="pat-contact">Contact Number</label><input id="pat-contact" type="text" placeholder="+55-27-99000-0000" /></div>
+          </div>
+          <button class="btn" type="submit" aria-label="Register new patient">Register Patient</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Reminder Outreach Queue</h2>
+        <div class="table-wrap">
+          <table aria-label="Reminder outreach queue">
+            <thead>
+              <tr><th>Patient</th><th>Date</th><th>Risk</th><th>Action</th><th>Status</th><th>Dispatch</th></tr>
+            </thead>
+            <tbody id="reminders-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ML MODEL INSIGHTS -->
+    <section id="tab-model" class="panel" role="tabpanel" aria-labelledby="btn-model">
+      <div class="card">
+        <h2>ML Engine &amp; Evaluation Metrics</h2>
+        <div id="model-insights-body" aria-live="polite">Loading model insights...</div>
+        <div style="margin-top:1rem;">
+          <button class="btn" type="button" onclick="retrainModel()" aria-label="Retrain Weka Random Forest model">Retrain Model</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    ClinicFlow &mdash; Advisory AI Decision Support Only (No Automated Patient Denial)
+  </footer>
+
+  <script>
+    const defaultDate = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    document.getElementById('sim-date').value = defaultDate;
+    document.getElementById('book-date').value = defaultDate;
+
+    function switchTab(name) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', 'false'));
+      document.getElementById('tab-' + name).classList.add('active');
+      document.getElementById('btn-' + name).setAttribute('aria-selected', 'true');
+      refreshAll();
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('global-toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function api(url, opts) {
+      const res = await fetch(url, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function refreshAll() {
+      try {
+        const [dash, patients, doctors, appts, queue, reminders, model] = await Promise.all([
+          api('/api/dashboard'),
+          api('/api/patients'),
+          api('/api/doctors'),
+          api('/api/appointments'),
+          api('/api/queue'),
+          api('/api/reminders'),
+          api('/api/model/insights')
+        ]);
+
+        document.getElementById('model-status').textContent = dash.modelAvailable ? 'ML Engine: Ready (Weka RF)' : 'ML Engine: Unavailable';
+        document.getElementById('kpi-patients').textContent = dash.totalPatients;
+        document.getElementById('kpi-appts').textContent = dash.totalAppointments;
+        document.getElementById('kpi-queue').textContent = dash.todayQueueCount;
+        document.getElementById('kpi-high').textContent = dash.highRiskCount;
+        document.getElementById('kpi-reminders').textContent = dash.pendingReminders;
+
+        const patSel = document.getElementById('book-patient');
+        patSel.innerHTML = patients.patients.map(p => `<option value="${p.id}">${p.name} (Age ${p.age})</option>`).join('');
+
+        const docSel = document.getElementById('book-doctor');
+        docSel.innerHTML = doctors.doctors.map(d => `<option value="${d.id}">${d.name} (${d.specialty})</option>`).join('');
+
+        document.getElementById('appointments-body').innerHTML = appts.appointments.map(a => {
+          const risk = a.prediction && a.prediction.riskCategory ? a.prediction.riskCategory : 'N/A';
+          const prob = a.prediction && a.prediction.noShowProbability != null ? (a.prediction.noShowProbability * 100).toFixed(1) + '%' : '-';
+          const act = a.prediction && a.prediction.suggestedAction ? a.prediction.suggestedAction : '-';
+          return `<tr>
+            <td><strong>${a.queueToken || '-'}</strong></td>
+            <td>${a.patientName}</td>
+            <td>${a.doctorName}</td>
+            <td>${a.appointmentDay} ${a.appointmentTime}</td>
+            <td>${a.leadDays}d</td>
+            <td><span class="badge badge-${risk}">${risk} (${prob})</span></td>
+            <td>${act}</td>
+            <td>${a.attendanceStatus}</td>
+          </tr>`;
+        }).join('');
+
+        document.getElementById('queue-body').innerHTML = queue.queue.map(q => `<tr>
+          <td><strong>${q.queueToken}</strong></td>
+          <td>${q.patientName}</td>
+          <td>${q.doctorName}</td>
+          <td>${q.appointmentTime}</td>
+          <td>${q.attendanceStatus}</td>
+          <td>
+            <button class="btn btn-sm" onclick="queueAction('checkin', ${q.appointmentId})" aria-label="Check in ${q.patientName}">Check In</button>
+            <button class="btn btn-sm" onclick="queueAction('start', ${q.appointmentId})" aria-label="Start consultation for ${q.patientName}">Start</button>
+            <button class="btn btn-sm" onclick="queueAction('complete', ${q.appointmentId})" aria-label="Complete consultation for ${q.patientName}">Complete</button>
+            <button class="btn btn-sm btn-secondary" onclick="queueAction('noshow', ${q.appointmentId})" aria-label="Mark no-show for ${q.patientName}">No-Show</button>
+          </td>
+        </tr>`).join('') || '<tr><td colspan="6">No active appointments in today\'s queue.</td></tr>';
+
+        document.getElementById('reminders-body').innerHTML = reminders.reminders.map(r => `<tr>
+          <td>${r.patientName}</td>
+          <td>${r.appointmentDay}</td>
+          <td><span class="badge badge-${r.riskCategory}">${r.riskCategory}</span></td>
+          <td>${r.recommendedAction}</td>
+          <td>${r.status}</td>
+          <td>${r.status === 'PENDING' ? `<button class="btn btn-sm" onclick="sendReminder(${r.reminderId})" aria-label="Send reminder to ${r.patientName}">Send</button>` : 'Dispatched'}</td>
+        </tr>`).join('');
+
+        document.getElementById('model-insights-body').innerHTML = `
+          <p><strong>Algorithm:</strong> ${model.algorithm} (${model.selectedVariant})</p>
+          <p><strong>Features:</strong> ${(model.features || []).join(', ')}</p>
+          <p><strong>Metrics:</strong> Accuracy ${(model.accuracy * 100).toFixed(2)}% | Precision ${model.precision.toFixed(4)} | Recall ${model.recall.toFixed(4)} | F1 ${model.f1Score.toFixed(4)} | ROC-AUC ${model.rocArea.toFixed(4)}</p>
+          <p><strong>Records:</strong> Train ${model.trainRecords} / Test ${model.testRecords} (Cleaned Total: ${model.totalCleanedRecords})</p>
+        `;
+      } catch (err) {
+        showToast('Error: ' + err.message);
+      }
+    }
+
+    async function runPrediction(e) {
+      e.preventDefault();
+      try {
+        const res = await api('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            age: Number(document.getElementById('sim-age').value),
+            gender: document.getElementById('sim-gender').value,
+            appointmentDay: document.getElementById('sim-date').value,
+            neighbourhood: document.getElementById('sim-hood').value
+          })
+        });
+        const p = res.prediction;
+        const slots = (res.recommendedAlternativeSlots || []).map(s => `${s.date} (${(s.noShowProbability * 100).toFixed(1)}% - ${s.riskCategory})`).join(' | ');
+        const box = document.getElementById('sim-result');
+        box.style.display = 'block';
+        box.innerHTML = `<strong>Predicted No-Show:</strong> ${(p.noShowProbability * 100).toFixed(1)}% &mdash; <span class="badge badge-${p.riskCategory}">${p.riskCategory}</span><br/>
+          <strong>Recommended Action:</strong> ${p.suggestedAction} (${p.actionDescription})<br/>
+          <strong>Lower-Risk Slots:</strong> ${slots || 'Current slot is optimal'}`;
+      } catch (err) {
+        showToast('Prediction error: ' + err.message);
+      }
+    }
+
+    async function bookAppointment(e) {
+      e.preventDefault();
+      try {
+        const res = await api('/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: Number(document.getElementById('book-patient').value),
+            doctorId: Number(document.getElementById('book-doctor').value),
+            appointmentDay: document.getElementById('book-date').value,
+            appointmentTime: document.getElementById('book-time').value,
+            neighbourhood: document.getElementById('book-hood').value
+          })
+        });
+        showToast(`Booked ${res.appointment.queueToken} — Risk: ${res.appointment.prediction.riskCategory}`);
+        refreshAll();
+      } catch (err) {
+        showToast('Booking error: ' + err.message);
+      }
+    }
+
+    async function registerPatient(e) {
+      e.preventDefault();
+      try {
+        const res = await api('/api/patients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('pat-name').value,
+            gender: document.getElementById('pat-gender').value,
+            age: Number(document.getElementById('pat-age').value),
+            contactNumber: document.getElementById('pat-contact').value
+          })
+        });
+        showToast(`Registered patient ${res.patient.name} (ID ${res.patient.id})`);
+        e.target.reset();
+        refreshAll();
+      } catch (err) {
+        showToast('Registration error: ' + err.message);
+      }
+    }
+
+    async function queueAction(action, id) {
+      try {
+        await api('/api/queue/' + action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId: id })
+        });
+        showToast('Queue updated');
+        refreshAll();
+      } catch (err) {
+        showToast('Queue error: ' + err.message);
+      }
+    }
+
+    async function sendReminder(id) {
+      try {
+        await api('/api/reminders/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reminderId: id })
+        });
+        showToast('Reminder simulated and logged');
+        refreshAll();
+      } catch (err) {
+        showToast('Reminder error: ' + err.message);
+      }
+    }
+
+    async function retrainModel() {
+      try {
+        showToast('Retraining Weka RandomForest...');
+        const res = await api('/api/model/retrain', { method: 'POST', body: '{}' });
+        showToast(`Model retrained: ${res.selectedModel} (AUC ${res.rocArea.toFixed(4)})`);
+        refreshAll();
+      } catch (err) {
+        showToast('Retrain error: ' + err.message);
+      }
+    }
+
+    refreshAll();
+  </script>
+</body>
+</html>
