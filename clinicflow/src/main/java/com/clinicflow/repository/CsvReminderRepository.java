@@ -118,16 +118,16 @@ public class CsvReminderRepository implements ReminderRepository {
                 printer.printRecord(
                         r.getReminderId(),
                         r.getAppointmentId(),
-                        r.getPatientName(),
-                        r.getPatientContact(),
+                        CsvSanitizer.sanitize(r.getPatientName()),
+                        CsvSanitizer.sanitizeContact(r.getPatientContact()),
                         r.getAppointmentDate().toString(),
                         r.getAppointmentTime() != null ? r.getAppointmentTime().toString() : "09:00:00",
-                        r.getDoctorName(),
+                        CsvSanitizer.sanitize(r.getDoctorName()),
                         r.getRiskCategory().name(),
                         r.getRecommendedAction().name(),
                         r.getStatus(),
                         sentStr,
-                        r.getNotes() != null ? r.getNotes() : ""
+                        CsvSanitizer.sanitize(r.getNotes())
                 );
             }
             printer.flush();

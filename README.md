@@ -6,7 +6,9 @@
 [![Tests](https://img.shields.io/badge/Tests-JUnit%205%20%2B%20AssertJ-brightgreen.svg)](https://junit.org/junit5/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**ClinicFlow** is a Cloud Run–ready Java 17 web service, ML decision-support engine, and clinical queue assistant for outpatient clinics. It predicts patient appointment no-show risk at booking time using a **Weka Random Forest** classifier and pairs predictions with context-aware outreach actions, lower-risk slot recommendations, and a strict FIFO clinic queue.
+**ClinicFlow** is a Cloud Run / Render–ready Java 17 web service, ML decision-support engine, and clinical queue assistant for outpatient clinics. It predicts patient appointment no-show risk at booking time using a **Weka Random Forest** classifier and pairs predictions with context-aware outreach actions, lower-risk slot recommendations, and a strict FIFO clinic queue.
+
+> **Live Deployed Demo:** [https://clinicflow-9uhp.onrender.com/](https://clinicflow-9uhp.onrender.com/)
 
 ---
 

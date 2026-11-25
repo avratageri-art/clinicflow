@@ -73,7 +73,35 @@ class ClinicFlowWebServerTest {
                 HttpResponse.BodyHandlers.ofString()
         );
         assertThat(resp.statusCode()).isEqualTo(200);
-        assertThat(resp.body()).contains("<header>", "<nav ", "<main ", "aria-label=", "aria-live=");
+        assertThat(resp.body()).contains("<header>", "<nav ", "<main ", "aria-label=", "aria-live=", "aria-pressed=");
+        assertThat(resp.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
+        assertThat(resp.headers().firstValue("X-Frame-Options")).contains("DENY");
+        assertThat(resp.headers().firstValue("Referrer-Policy")).contains("no-referrer");
+        assertThat(resp.headers().firstValue("Content-Security-Policy")).isPresent();
+    }
+
+    @Test
+    @DisplayName("Security & input validation: malformed JSON, invalid age, oversized payload, and CSV formula sanitization")
+    void testSecurityAndValidationGuards() throws Exception {
+        // 1. Malformed JSON returns 400 without stack trace
+        HttpResponse<String> badJson = post("/api/predict", "{invalid-json");
+        assertThat(badJson.statusCode()).isEqualTo(400);
+        assertThat(badJson.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
+        assertThat(badJson.body()).doesNotContain("Exception", "java.lang");
+
+        // 2. Out-of-bounds age returns 400
+        HttpResponse<String> badAge = post("/api/predict", "{\"age\":150}");
+        assertThat(badAge.statusCode()).isEqualTo(400);
+
+        // 3. Oversized payload (> 64 KB) returns 400
+        String huge = "{\"name\":\"" + "A".repeat(70_000) + "\",\"age\":30}";
+        HttpResponse<String> hugeResp = post("/api/patients", huge);
+        assertThat(hugeResp.statusCode()).isEqualTo(400);
+
+        // 4. CSV formula injection sanitizer neutralizes leading triggers while keeping E.164 phone numbers
+        assertThat(com.clinicflow.repository.CsvSanitizer.sanitize("=CMD('calc')")).isEqualTo("'=CMD('calc')");
+        assertThat(com.clinicflow.repository.CsvSanitizer.sanitize("@SUM(A1:A2)")).isEqualTo("'@SUM(A1:A2)");
+        assertThat(com.clinicflow.repository.CsvSanitizer.sanitizeContact("+55-27-99123-4567")).isEqualTo("+55-27-99123-4567");
     }
 
     @Test

@@ -38,7 +38,11 @@ import java.util.logging.Logger;
 public class ClinicFlowWebServer {
 
     private static final Logger LOGGER = Logger.getLogger(ClinicFlowWebServer.class.getName());
-    private static final int MAX_BODY_BYTES = 256 * 1024;
+    private static final int MAX_BODY_BYTES = 64 * 1024;
+    private static final int MAX_NAME_LENGTH = 120;
+    private static final int MAX_TEXT_LENGTH = 120;
+    private static final int MAX_NOTES_LENGTH = 300;
+    private static final int MAX_AGE = 120;
 
     private final ApplicationConfig config;
     private final PatientService patientService;
@@ -158,8 +162,10 @@ public class ClinicFlowWebServer {
                 return;
             }
             byte[] html = is.readAllBytes();
+            applySecurityHeaders(ex);
             ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-            ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+            ex.getResponseHeaders().set("Content-Security-Policy",
+                    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'");
             ex.sendResponseHeaders(200, html.length);
             try (OutputStream os = ex.getResponseBody()) {
                 os.write(html);
@@ -220,10 +226,13 @@ public class ClinicFlowWebServer {
                 sendJson(ex, 200, Map.of("patients", list));
             } else if ("POST".equalsIgnoreCase(method)) {
                 Map<String, Object> body = readJsonBody(ex);
-                String name = getString(body, "name");
+                String name = requireBoundedString(getString(body, "name"), "name", MAX_NAME_LENGTH, true);
                 Gender gender = Gender.fromCode(getString(body, "gender", "F"));
                 int age = getInt(body, "age", -1);
-                String contact = getString(body, "contactNumber", "");
+                if (age < 0 || age > MAX_AGE) {
+                    throw new ValidationException("Patient age must be between 0 and " + MAX_AGE);
+                }
+                String contact = requireBoundedString(getString(body, "contactNumber", ""), "contactNumber", 30, false);
                 boolean scholarship = getBool(body, "scholarship", false);
                 boolean hipertension = getBool(body, "hipertension", false);
                 boolean diabetes = getBool(body, "diabetes", false);
@@ -274,8 +283,8 @@ public class ClinicFlowWebServer {
                 Long doctorId = getLong(body, "doctorId");
                 String dateStr = getString(body, "appointmentDay");
                 String timeStr = getString(body, "appointmentTime", "09:30");
-                String neighbourhood = getString(body, "neighbourhood", "CENTRO");
-                String notes = getString(body, "notes", "");
+                String neighbourhood = requireBoundedString(getString(body, "neighbourhood", "CENTRO"), "neighbourhood", MAX_TEXT_LENGTH, false);
+                String notes = requireBoundedString(getString(body, "notes", ""), "notes", MAX_NOTES_LENGTH, false);
 
                 if (patientId == null || doctorId == null || dateStr == null || dateStr.isBlank()) {
                     throw new ValidationException("patientId, doctorId, and appointmentDay (YYYY-MM-DD) are required");
@@ -299,8 +308,10 @@ public class ClinicFlowWebServer {
                     }
                 }
 
+                int queueLoad = appointmentService.getTodayQueue(LocalDate.now()).size();
                 Map<String, Object> resp = new LinkedHashMap<>();
                 resp.put("appointment", toAppointmentMap(booked));
+                resp.put("triageGuidance", buildTriageGuidance(booked.getPredictionResult(), booked.getLeadDays(), queueLoad));
                 resp.put("recommendedAlternativeSlots", alternatives);
                 sendJson(ex, 201, resp);
             } else {
@@ -319,12 +330,12 @@ public class ClinicFlowWebServer {
         try {
             Map<String, Object> body = readJsonBody(ex);
             int age = getInt(body, "age", 35);
-            if (age < 0 || age > 125) {
-                throw new ValidationException("Age must be between 0 and 125");
+            if (age < 0 || age > MAX_AGE) {
+                throw new ValidationException("Age must be between 0 and " + MAX_AGE);
             }
             Gender gender = Gender.fromCode(getString(body, "gender", "F"));
             String dateStr = getString(body, "appointmentDay", LocalDate.now().plusDays(7).toString());
-            String neighbourhood = getString(body, "neighbourhood", "CENTRO");
+            String neighbourhood = requireBoundedString(getString(body, "neighbourhood", "CENTRO"), "neighbourhood", MAX_TEXT_LENGTH, false);
             LocalDate apptDate = LocalDate.parse(dateStr.trim());
             if (apptDate.isBefore(LocalDate.now())) {
                 throw new ValidationException("appointmentDay cannot be in the past");
@@ -343,10 +354,13 @@ public class ClinicFlowWebServer {
                 alternatives.add(toSlotMap(slot));
             }
 
+            int queueLoad = appointmentService.getTodayQueue(LocalDate.now()).size();
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("leadDays", tempAppt.getLeadDays());
             resp.put("appointmentWeekday", apptDate.getDayOfWeek().name());
+            resp.put("todayQueueLoad", queueLoad);
             resp.put("prediction", toPredictionMap(pred));
+            resp.put("triageGuidance", buildTriageGuidance(pred, tempAppt.getLeadDays(), queueLoad));
             resp.put("recommendedAlternativeSlots", alternatives);
             sendJson(ex, 200, resp);
         } catch (Exception e) {
@@ -548,12 +562,41 @@ public class ClinicFlowWebServer {
     }
 
     private Map<String, Object> readJsonBody(HttpExchange ex) throws IOException {
-        byte[] raw = ex.getRequestBody().readNBytes(MAX_BODY_BYTES + 1);
-        if (raw.length > MAX_BODY_BYTES) {
-            throw new ValidationException("Request body exceeds maximum allowed size");
+        try (InputStream bodyStream = ex.getRequestBody()) {
+            byte[] raw = bodyStream.readNBytes(MAX_BODY_BYTES + 1);
+            if (raw.length > MAX_BODY_BYTES) {
+                throw new ValidationException("Request body exceeds maximum allowed size (64 KB)");
+            }
+            String text = new String(raw, StandardCharsets.UTF_8);
+            return JsonUtil.parseObject(text);
         }
-        String text = new String(raw, StandardCharsets.UTF_8);
-        return JsonUtil.parseObject(text);
+    }
+
+    private static String requireBoundedString(String val, String fieldName, int maxLength, boolean required) {
+        String trimmed = val == null ? "" : val.trim();
+        if (required && trimmed.isEmpty()) {
+            throw new ValidationException(fieldName + " is required");
+        }
+        if (trimmed.length() > maxLength) {
+            throw new ValidationException(fieldName + " exceeds maximum length of " + maxLength + " characters");
+        }
+        return trimmed;
+    }
+
+    private static String buildTriageGuidance(PredictionResult pred, long leadDays, int todayQueueLoad) {
+        if (pred == null || !pred.isModelAvailable()) {
+            return "Advisory only: ML model unavailable; apply standard clinic confirmation.";
+        }
+        RiskCategory risk = pred.getRiskCategory();
+        String leadContext = leadDays == 0 ? "Same-day booking" : leadDays + "-day lead time";
+        String queueContext = todayQueueLoad >= 10 ? "High today queue load (" + todayQueueLoad + " active)" : "Normal today queue load (" + todayQueueLoad + " active)";
+        if (risk == RiskCategory.HIGH) {
+            return leadContext + " | " + queueContext + " — Prioritize coordinator phone call and prepare optional backfill slot (advisory only; queue order remains strict FIFO).";
+        }
+        if (risk == RiskCategory.MEDIUM) {
+            return leadContext + " | " + queueContext + " — Send two-way SMS confirmation link and offer lower-risk alternative dates if helpful (advisory only).";
+        }
+        return leadContext + " | " + queueContext + " — Standard automated 24h SMS reminder is sufficient (advisory only).";
     }
 
     private void handleApiException(HttpExchange ex, Exception e) throws IOException {
@@ -571,10 +614,16 @@ public class ClinicFlowWebServer {
         }
     }
 
+    private void applySecurityHeaders(HttpExchange ex) {
+        ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        ex.getResponseHeaders().set("X-Frame-Options", "DENY");
+        ex.getResponseHeaders().set("Referrer-Policy", "no-referrer");
+    }
+
     private void sendJson(HttpExchange ex, int status, Object payload) throws IOException {
         byte[] bytes = JsonUtil.toJson(payload).getBytes(StandardCharsets.UTF_8);
+        applySecurityHeaders(ex);
         ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
@@ -586,6 +635,7 @@ public class ClinicFlowWebServer {
 
     private void sendText(HttpExchange ex, int status, String contentType, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        applySecurityHeaders(ex);
         ex.getResponseHeaders().set("Content-Type", contentType);
         ex.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {

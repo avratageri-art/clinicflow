@@ -160,7 +160,7 @@ public class CsvAppointmentRepository implements AppointmentRepository {
                         a.getAppointmentDay().toString(),
                         a.getAppointmentTime() != null ? a.getAppointmentTime().toString() : "09:00:00",
                         a.getQueueToken(),
-                        a.getNeighbourhood(),
+                        CsvSanitizer.sanitize(a.getNeighbourhood()),
                         a.isSmsReceived(),
                         a.getAttendanceStatus().name(),
                         predClass,
@@ -168,9 +168,9 @@ public class CsvAppointmentRepository implements AppointmentRepository {
                         attProb,
                         risk,
                         action,
-                        a.getNotes() != null ? a.getNotes() : "",
+                        CsvSanitizer.sanitize(a.getNotes()),
                         checkInStr,
-                        a.getReminderStatus()
+                        CsvSanitizer.sanitize(a.getReminderStatus())
                 );
             }
             printer.flush();

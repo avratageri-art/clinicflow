@@ -146,9 +146,29 @@
       font-size: 0.78rem;
       font-weight: 700;
     }
-    .badge-LOW { background: var(--low-bg); color: var(--low-fg); }
-    .badge-MEDIUM { background: var(--med-bg); color: var(--med-fg); }
-    .badge-HIGH { background: var(--high-bg); color: var(--high-fg); }
+    .badge-LOW { background: var(--low-bg); color: var(--low-fg); border: 1px solid #15803d; }
+    .badge-MEDIUM { background: var(--med-bg); color: var(--med-fg); border: 1px solid #b45309; }
+    .badge-HIGH { background: var(--high-bg); color: var(--high-fg); border: 1px solid #b91c1c; }
+    body.high-contrast {
+      --bg: #000000;
+      --surface: #0a0a0a;
+      --border: #ffffff;
+      --text: #ffffff;
+      --muted: #e5e7eb;
+      --primary: #ffdd00;
+      --primary-dark: #facc15;
+      --focus: #00ffff;
+    }
+    body.high-contrast .btn,
+    body.high-contrast nav button[aria-selected="true"] {
+      color: #000000;
+      border: 2px solid #ffffff;
+    }
+    body.high-contrast th { background: #1e293b; color: #ffffff; }
+    body.high-contrast input, body.high-contrast select {
+      background: #000000; color: #ffffff; border: 2px solid #ffffff;
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -186,7 +206,10 @@
       <h1>ClinicFlow</h1>
       <p>Smart Patient No-Show Prediction &amp; Clinic Queue Assistant</p>
     </div>
-    <div class="status-pill" id="model-status" aria-live="polite">Checking ML engine...</div>
+    <div class="header-actions">
+      <button type="button" id="contrast-toggle" class="btn btn-secondary" aria-pressed="false" aria-label="Toggle high contrast mode" onclick="toggleHighContrast()">High Contrast: Off</button>
+      <div class="status-pill" id="model-status" aria-live="polite">Checking ML engine...</div>
+    </div>
   </header>
 
   <nav aria-label="Primary navigation" role="tablist">
@@ -352,6 +375,19 @@
     document.getElementById('sim-date').value = defaultDate;
     document.getElementById('book-date').value = defaultDate;
 
+    function riskBadge(risk, suffix) {
+      const icons = { LOW: '✓ ', MEDIUM: '! ', HIGH: '▲ ' };
+      const prefix = icons[risk] || '';
+      return `<span class="badge badge-${risk}">${prefix}${risk}${suffix || ''}</span>`;
+    }
+
+    function toggleHighContrast() {
+      const btn = document.getElementById('contrast-toggle');
+      const active = document.body.classList.toggle('high-contrast');
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.textContent = active ? 'High Contrast: On' : 'High Contrast: Off';
+    }
+
     function switchTab(name) {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', 'false'));
@@ -409,7 +445,7 @@
             <td>${a.doctorName}</td>
             <td>${a.appointmentDay} ${a.appointmentTime}</td>
             <td>${a.leadDays}d</td>
-            <td><span class="badge badge-${risk}">${risk} (${prob})</span></td>
+            <td>${riskBadge(risk, ' (' + prob + ')')}</td>
             <td>${act}</td>
             <td>${a.attendanceStatus}</td>
           </tr>`;
@@ -432,7 +468,7 @@
         document.getElementById('reminders-body').innerHTML = reminders.reminders.map(r => `<tr>
           <td>${r.patientName}</td>
           <td>${r.appointmentDay}</td>
-          <td><span class="badge badge-${r.riskCategory}">${r.riskCategory}</span></td>
+          <td>${riskBadge(r.riskCategory, '')}</td>
           <td>${r.recommendedAction}</td>
           <td>${r.status}</td>
           <td>${r.status === 'PENDING' ? `<button class="btn btn-sm" onclick="sendReminder(${r.reminderId})" aria-label="Send reminder to ${r.patientName}">Send</button>` : 'Dispatched'}</td>
@@ -466,8 +502,9 @@
         const slots = (res.recommendedAlternativeSlots || []).map(s => `${s.date} (${(s.noShowProbability * 100).toFixed(1)}% - ${s.riskCategory})`).join(' | ');
         const box = document.getElementById('sim-result');
         box.style.display = 'block';
-        box.innerHTML = `<strong>Predicted No-Show:</strong> ${(p.noShowProbability * 100).toFixed(1)}% &mdash; <span class="badge badge-${p.riskCategory}">${p.riskCategory}</span><br/>
+        box.innerHTML = `<strong>Predicted No-Show:</strong> ${(p.noShowProbability * 100).toFixed(1)}% &mdash; ${riskBadge(p.riskCategory, '')}<br/>
           <strong>Recommended Action:</strong> ${p.suggestedAction} (${p.actionDescription})<br/>
+          <strong>Triage Guidance:</strong> ${res.triageGuidance || ''}<br/>
           <strong>Lower-Risk Slots:</strong> ${slots || 'Current slot is optimal'}`;
       } catch (err) {
         showToast('Prediction error: ' + err.message);

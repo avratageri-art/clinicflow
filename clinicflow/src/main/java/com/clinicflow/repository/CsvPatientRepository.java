@@ -101,10 +101,10 @@ public class CsvPatientRepository implements PatientRepository {
             for (Patient p : patients) {
                 printer.printRecord(
                         p.getId(),
-                        p.getName(),
+                        CsvSanitizer.sanitize(p.getName()),
                         p.getGender().name(),
                         p.getAge(),
-                        p.getContactNumber(),
+                        CsvSanitizer.sanitizeContact(p.getContactNumber()),
                         p.isScholarship(),
                         p.isHipertension(),
                         p.isDiabetes(),

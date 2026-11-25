@@ -98,12 +98,12 @@ public class CsvDoctorRepository implements DoctorRepository {
             for (Doctor d : doctors) {
                 printer.printRecord(
                         d.getId(),
-                        d.getName(),
+                        CsvSanitizer.sanitize(d.getName()),
                         d.getGender().name(),
                         d.getAge(),
-                        d.getSpecialty(),
-                        d.getRoomNumber(),
-                        d.getContactNumber(),
+                        CsvSanitizer.sanitize(d.getSpecialty()),
+                        CsvSanitizer.sanitize(d.getRoomNumber()),
+                        CsvSanitizer.sanitizeContact(d.getContactNumber()),
                         d.isAvailable()
                 );
             }
