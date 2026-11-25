@@ -8,6 +8,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,11 +22,17 @@ final class WebSecuritySupport {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 120;
     private static final long WINDOW_MS = 60_000L;
+    private static final List<String> DANGEROUS_HTML_PATTERNS = List.of(
+            "<script", "</script", "javascript:", "onerror=", "onload=", "<iframe"
+    );
 
     private final ConcurrentHashMap<String, WindowCounter> ipCounters = new ConcurrentHashMap<>();
 
     /**
      * Enforces a lightweight per-IP sliding-window rate limit for API endpoints.
+     *
+     * @param ex HTTP exchange
+     * @return {@code true} if within limit, {@code false} if rate-limited
      */
     boolean allowRequest(HttpExchange ex) {
         String ip = ex.getRemoteAddress() != null && ex.getRemoteAddress().getAddress() != null
@@ -40,13 +48,33 @@ final class WebSecuritySupport {
         return counter.count.incrementAndGet() <= MAX_REQUESTS_PER_MINUTE;
     }
 
+    /**
+     * Validates that {@code POST} requests to JSON APIs declare {@code application/json}.
+     *
+     * @param ex HTTP exchange
+     * @return {@code true} if valid or non-POST, {@code false} if unsupported media type
+     */
+    boolean hasValidJsonContentType(HttpExchange ex) {
+        if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
+            return true;
+        }
+        String ct = ex.getRequestHeaders().getFirst("Content-Type");
+        if (ct == null) {
+            return false;
+        }
+        return ct.toLowerCase(Locale.ROOT).trim().startsWith("application/json");
+    }
+
     void applySecurityHeaders(HttpExchange ex, boolean isApi) {
         ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         ex.getResponseHeaders().set("X-Frame-Options", "DENY");
         ex.getResponseHeaders().set("Referrer-Policy", "no-referrer");
         ex.getResponseHeaders().set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+        ex.getResponseHeaders().set("Cross-Origin-Opener-Policy", "same-origin");
+        ex.getResponseHeaders().set("Cross-Origin-Resource-Policy", "same-origin");
         if (isApi) {
-            ex.getResponseHeaders().set("Cache-Control", "no-store");
+            ex.getResponseHeaders().set("Cache-Control", "no-store, no-cache, must-revalidate");
+            ex.getResponseHeaders().set("Pragma", "no-cache");
         }
     }
 
@@ -54,9 +82,6 @@ final class WebSecuritySupport {
         byte[] bytes = JsonUtil.toJson(payload).getBytes(StandardCharsets.UTF_8);
         applySecurityHeaders(ex, isApi);
         ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
         ex.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(bytes);
@@ -88,7 +113,20 @@ final class WebSecuritySupport {
                 throw new ValidationException(fieldName + " contains invalid control characters");
             }
         }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        for (String pattern : DANGEROUS_HTML_PATTERNS) {
+            if (lower.contains(pattern)) {
+                throw new ValidationException(fieldName + " contains disallowed script or HTML content");
+            }
+        }
         return trimmed;
+    }
+
+    static long requirePositiveId(Long id, String fieldName) {
+        if (id == null || id <= 0) {
+            throw new ValidationException(fieldName + " must be a positive integer");
+        }
+        return id;
     }
 
     private static final class WindowCounter {

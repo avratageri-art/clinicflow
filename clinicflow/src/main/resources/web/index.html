@@ -410,10 +410,21 @@
     document.getElementById('sim-date').value = defaultDate;
     document.getElementById('book-date').value = defaultDate;
 
+    function escapeHtml(val) {
+      if (val == null) return '';
+      return String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function riskBadge(risk, suffix) {
+      const safeRisk = escapeHtml(risk);
       const icons = { LOW: '✓ ', MEDIUM: '! ', HIGH: '▲ ' };
       const prefix = icons[risk] || '';
-      return `<span class="badge badge-${risk}">${prefix}${risk}${suffix || ''}</span>`;
+      return `<span class="badge badge-${safeRisk}">${prefix}${safeRisk}${escapeHtml(suffix || '')}</span>`;
     }
 
     function toggleHighContrast() {
@@ -465,10 +476,10 @@
         document.getElementById('kpi-reminders').textContent = dash.pendingReminders;
 
         const patSel = document.getElementById('book-patient');
-        patSel.innerHTML = patients.patients.map(p => `<option value="${p.id}">${p.name} (Age ${p.age})</option>`).join('');
+        patSel.innerHTML = patients.patients.map(p => `<option value="${Number(p.id)}">${escapeHtml(p.name)} (Age ${Number(p.age)})</option>`).join('');
 
         const docSel = document.getElementById('book-doctor');
-        docSel.innerHTML = doctors.doctors.map(d => `<option value="${d.id}">${d.name} (${d.specialty})</option>`).join('');
+        docSel.innerHTML = doctors.doctors.map(d => `<option value="${Number(d.id)}">${escapeHtml(d.name)} (${escapeHtml(d.specialty)})</option>`).join('');
 
         document.getElementById('appointments-body').innerHTML = appts.appointments.map(a => {
           const risk = a.prediction && a.prediction.riskCategory ? a.prediction.riskCategory : 'LOW';
@@ -477,49 +488,49 @@
           const canCheckIn = a.attendanceStatus === 'SCHEDULED';
           const canCancel = a.attendanceStatus === 'SCHEDULED' || a.attendanceStatus === 'CHECKED_IN';
           return `<tr>
-            <td><strong>${a.queueToken || '-'}</strong></td>
-            <td>${a.patientName || 'Unknown'}</td>
-            <td>${a.doctorName || 'Unknown'}</td>
-            <td>${a.appointmentDay || '-'} ${a.appointmentTime || ''}</td>
-            <td>${a.leadDays != null ? a.leadDays : 0}d</td>
+            <td><strong>${escapeHtml(a.queueToken || '-')}</strong></td>
+            <td>${escapeHtml(a.patientName || 'Unknown')}</td>
+            <td>${escapeHtml(a.doctorName || 'Unknown')}</td>
+            <td>${escapeHtml(a.appointmentDay || '-')} ${escapeHtml(a.appointmentTime || '')}</td>
+            <td>${a.leadDays != null ? Number(a.leadDays) : 0}d</td>
             <td>${riskBadge(risk, ' (' + prob + ')')}</td>
-            <td>${act}</td>
-            <td>${a.attendanceStatus || '-'}</td>
+            <td>${escapeHtml(act)}</td>
+            <td>${escapeHtml(a.attendanceStatus || '-')}</td>
             <td>
-              ${canCheckIn ? `<button class="btn btn-sm" onclick="queueAction('checkin', ${a.appointmentId})" aria-label="Check in ${a.patientName}">Check In</button>` : ''}
-              ${canCancel ? `<button class="btn btn-sm btn-secondary" onclick="queueAction('cancel', ${a.appointmentId})" aria-label="Cancel ${a.patientName}">Cancel</button>` : ''}
+              ${canCheckIn ? `<button class="btn btn-sm" onclick="queueAction('checkin', ${Number(a.appointmentId)})" aria-label="Check in ${escapeHtml(a.patientName)}">Check In</button>` : ''}
+              ${canCancel ? `<button class="btn btn-sm btn-secondary" onclick="queueAction('cancel', ${Number(a.appointmentId)})" aria-label="Cancel ${escapeHtml(a.patientName)}">Cancel</button>` : ''}
             </td>
           </tr>`;
         }).join('') || '<tr><td colspan="9">No appointments scheduled yet.</td></tr>';
 
         document.getElementById('queue-body').innerHTML = queue.queue.map(q => `<tr>
-          <td><strong>${q.queueToken}</strong></td>
-          <td>${q.patientName}</td>
-          <td>${q.doctorName}</td>
-          <td>${q.appointmentTime}</td>
-          <td>${q.attendanceStatus}</td>
+          <td><strong>${escapeHtml(q.queueToken)}</strong></td>
+          <td>${escapeHtml(q.patientName)}</td>
+          <td>${escapeHtml(q.doctorName)}</td>
+          <td>${escapeHtml(q.appointmentTime)}</td>
+          <td>${escapeHtml(q.attendanceStatus)}</td>
           <td>
-            <button class="btn btn-sm" onclick="queueAction('checkin', ${q.appointmentId})" aria-label="Check in ${q.patientName}">Check In</button>
-            <button class="btn btn-sm" onclick="queueAction('start', ${q.appointmentId})" aria-label="Start consultation for ${q.patientName}">Start</button>
-            <button class="btn btn-sm" onclick="queueAction('complete', ${q.appointmentId})" aria-label="Complete consultation for ${q.patientName}">Complete</button>
-            <button class="btn btn-sm btn-secondary" onclick="queueAction('noshow', ${q.appointmentId})" aria-label="Mark no-show for ${q.patientName}">No-Show</button>
+            <button class="btn btn-sm" onclick="queueAction('checkin', ${Number(q.appointmentId)})" aria-label="Check in ${escapeHtml(q.patientName)}">Check In</button>
+            <button class="btn btn-sm" onclick="queueAction('start', ${Number(q.appointmentId)})" aria-label="Start consultation for ${escapeHtml(q.patientName)}">Start</button>
+            <button class="btn btn-sm" onclick="queueAction('complete', ${Number(q.appointmentId)})" aria-label="Complete consultation for ${escapeHtml(q.patientName)}">Complete</button>
+            <button class="btn btn-sm btn-secondary" onclick="queueAction('noshow', ${Number(q.appointmentId)})" aria-label="Mark no-show for ${escapeHtml(q.patientName)}">No-Show</button>
           </td>
         </tr>`).join('') || '<tr><td colspan="6">No active appointments in today\'s queue.</td></tr>';
 
         document.getElementById('reminders-body').innerHTML = reminders.reminders.map(r => `<tr>
-          <td>${r.patientName}</td>
-          <td>${r.appointmentDay}</td>
+          <td>${escapeHtml(r.patientName)}</td>
+          <td>${escapeHtml(r.appointmentDay)}</td>
           <td>${riskBadge(r.riskCategory, '')}</td>
-          <td>${r.recommendedAction}</td>
-          <td>${r.status}</td>
-          <td>${r.status === 'PENDING' ? `<button class="btn btn-sm" onclick="sendReminder(${r.reminderId})" aria-label="Send reminder to ${r.patientName}">Send</button>` : 'Dispatched'}</td>
+          <td>${escapeHtml(r.recommendedAction)}</td>
+          <td>${escapeHtml(r.status)}</td>
+          <td>${r.status === 'PENDING' ? `<button class="btn btn-sm" onclick="sendReminder(${Number(r.reminderId)})" aria-label="Send reminder to ${escapeHtml(r.patientName)}">Send</button>` : 'Dispatched'}</td>
         </tr>`).join('');
 
         document.getElementById('model-insights-body').innerHTML = `
-          <p><strong>Algorithm:</strong> ${model.algorithm} (${model.selectedVariant})</p>
-          <p><strong>Features:</strong> ${(model.features || []).join(', ')}</p>
+          <p><strong>Algorithm:</strong> ${escapeHtml(model.algorithm)} (${escapeHtml(model.selectedVariant)})</p>
+          <p><strong>Features:</strong> ${(model.features || []).map(escapeHtml).join(', ')}</p>
           <p><strong>Metrics:</strong> Accuracy ${(model.accuracy * 100).toFixed(2)}% | Precision ${model.precision.toFixed(4)} | Recall ${model.recall.toFixed(4)} | F1 ${model.f1Score.toFixed(4)} | ROC-AUC ${model.rocArea.toFixed(4)}</p>
-          <p><strong>Records:</strong> Train ${model.trainRecords} / Test ${model.testRecords} (Cleaned Total: ${model.totalCleanedRecords})</p>
+          <p><strong>Records:</strong> Train ${Number(model.trainRecords)} / Test ${Number(model.testRecords)} (Cleaned Total: ${Number(model.totalCleanedRecords)})</p>
         `;
       } catch (err) {
         showToast('Error: ' + err.message);
@@ -583,32 +594,32 @@
         if (res.contextSignals) {
           const s = res.contextSignals;
           sigBox.innerHTML = [
-            `Appts: ${s.totalAppointments}`,
-            `High-Risk: ${s.highRiskCount}`,
-            `Unreminded High-Risk: ${s.unremindedHighRiskCount}`,
-            `Queue Depth: ${s.activeQueueDepth}`,
-            `Busiest: ${s.busiestDoctor} (${s.busiestDoctorLoad})`
+            `Appts: ${Number(s.totalAppointments)}`,
+            `High-Risk: ${Number(s.highRiskCount)}`,
+            `Unreminded High-Risk: ${Number(s.unremindedHighRiskCount)}`,
+            `Queue Depth: ${Number(s.activeQueueDepth)}`,
+            `Busiest: ${escapeHtml(s.busiestDoctor)} (${Number(s.busiestDoctorLoad)})`
           ].map(t => `<span class="badge" style="background:#e2e8f0;color:#0f172a;">${t}</span>`).join('');
         }
-        const steps = (res.reasoningSteps || []).map(s => `<li>${s}</li>`).join('');
+        const steps = (res.reasoningSteps || []).map(s => `<li>${escapeHtml(s)}</li>`).join('');
         const actions = (res.recommendedActions || []).map(a => {
           let btn = '';
           if (a.oneClickAction) {
             const act = a.oneClickAction;
             if (act.type === 'SEND_REMINDER') {
-              btn = ` <button type="button" class="btn btn-sm" onclick="sendReminder(${act.reminderId})">${act.label}</button>`;
+              btn = ` <button type="button" class="btn btn-sm" onclick="sendReminder(${Number(act.reminderId)})">${escapeHtml(act.label)}</button>`;
             } else if (act.type === 'CHECK_IN') {
-              btn = ` <button type="button" class="btn btn-sm" onclick="queueAction('checkin', ${act.appointmentId})">${act.label}</button>`;
+              btn = ` <button type="button" class="btn btn-sm" onclick="queueAction('checkin', ${Number(act.appointmentId)})">${escapeHtml(act.label)}</button>`;
             } else if (act.type === 'APPLY_SLOT') {
-              btn = ` <button type="button" class="btn btn-sm" onclick="applyBookingSlot('${act.date}','${act.time}')">${act.label}</button>`;
+              btn = ` <button type="button" class="btn btn-sm" onclick="applyBookingSlot('${escapeHtml(act.date)}','${escapeHtml(act.time)}')">${escapeHtml(act.label)}</button>`;
             }
           }
-          return `<li>${a.detail || ''}${btn}</li>`;
+          return `<li>${escapeHtml(a.detail || '')}${btn}</li>`;
         }).join('');
-        box.innerHTML = `<strong>Intent:</strong> ${res.intent} &mdash; <strong>${res.answer}</strong>` +
+        box.innerHTML = `<strong>Intent:</strong> ${escapeHtml(res.intent)} &mdash; <strong>${escapeHtml(res.answer)}</strong>` +
           (steps ? `<ul style="margin:0.4rem 0 0.4rem 1.2rem;">${steps}</ul>` : '') +
           (actions ? `<div style="margin-top:0.35rem;"><strong>Recommended Actions:</strong><ul style="margin:0.25rem 0 0 1.2rem;">${actions}</ul></div>` : '');
-        assistantHistory.unshift(`<strong>Q:</strong> ${query} &rarr; <em>${res.intent}</em>`);
+        assistantHistory.unshift(`<strong>Q:</strong> ${escapeHtml(query)} &rarr; <em>${escapeHtml(res.intent)}</em>`);
         if (assistantHistory.length > 4) assistantHistory.pop();
         histBox.innerHTML = assistantHistory.length > 1 ? `<strong>Recent Turns:</strong> ` + assistantHistory.slice(1).join(' | ') : '';
       } catch (err) {
@@ -717,7 +728,11 @@
     async function retrainModel() {
       try {
         showToast('Retraining Weka RandomForest...');
-        const res = await api('/api/model/retrain', { method: 'POST', body: '{}' });
+        const res = await api('/api/model/retrain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}'
+        });
         showToast(`Model retrained: ${res.selectedModel} (AUC ${res.rocArea.toFixed(4)})`);
         refreshAll();
       } catch (err) {

@@ -34,6 +34,12 @@ public class ClinicFlowWebServer {
     private static final int DEFAULT_PORT = 8080;
     private static final int MAX_PORT = 65535;
     private static final int EXECUTOR_THREADS = 8;
+    private static final int HTTP_NO_CONTENT = 204;
+    private static final int HTTP_UNSUPPORTED_MEDIA = 415;
+    private static final int HTTP_TOO_MANY_REQUESTS = 429;
+    private static final String CSP_HEADER =
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     private static final int MAX_BODY_BYTES = 64 * 1024;
     private static final int MAX_NAME_LEN = 120;
     private static final int MAX_TEXT_LEN = 120;
@@ -165,15 +171,16 @@ public class ClinicFlowWebServer {
         return ex -> {
             if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
                 security.applySecurityHeaders(ex, true);
-                ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-                ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
-                ex.sendResponseHeaders(204, -1);
+                ex.sendResponseHeaders(HTTP_NO_CONTENT, -1);
                 ex.close();
                 return;
             }
             if (!security.allowRequest(ex)) {
-                security.sendError(ex, 429, "Rate limit exceeded (max 120 requests/minute)", null);
+                security.sendError(ex, HTTP_TOO_MANY_REQUESTS, "Rate limit exceeded (max 120 requests/minute)", null);
+                return;
+            }
+            if (!security.hasValidJsonContentType(ex)) {
+                security.sendError(ex, HTTP_UNSUPPORTED_MEDIA, "Content-Type must be application/json", null);
                 return;
             }
             delegate.handle(ex);
@@ -198,8 +205,7 @@ public class ClinicFlowWebServer {
             byte[] html = is.readAllBytes();
             security.applySecurityHeaders(ex, false);
             ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-            ex.getResponseHeaders().set("Content-Security-Policy",
-                    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'");
+            ex.getResponseHeaders().set("Content-Security-Policy", CSP_HEADER);
             ex.sendResponseHeaders(200, html.length);
             try (OutputStream os = ex.getResponseBody()) {
                 os.write(html);

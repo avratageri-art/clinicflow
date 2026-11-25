@@ -77,7 +77,12 @@ class ClinicFlowWebServerTest {
         assertThat(resp.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
         assertThat(resp.headers().firstValue("X-Frame-Options")).contains("DENY");
         assertThat(resp.headers().firstValue("Referrer-Policy")).contains("no-referrer");
-        assertThat(resp.headers().firstValue("Content-Security-Policy")).isPresent();
+        assertThat(resp.headers().firstValue("Cross-Origin-Opener-Policy")).contains("same-origin");
+        assertThat(resp.headers().firstValue("Cross-Origin-Resource-Policy")).contains("same-origin");
+        assertThat(resp.headers().firstValue("Content-Security-Policy"))
+                .isPresent()
+                .hasValueSatisfying(csp -> assertThat(csp).contains("frame-ancestors 'none'"));
+        assertThat(resp.headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
     }
 
     @Test
@@ -99,19 +104,31 @@ class ClinicFlowWebServerTest {
         assertThat(hugeResp.statusCode()).isEqualTo(413);
         assertThat(hugeResp.body()).contains("\"code\":413", "\"timestamp\"");
 
-        // 4. Control characters rejected with 400
+        // 4. Control characters and XSS payloads rejected with 400
         HttpResponse<String> ctrlResp = post("/api/patients", "{\"name\":\"Bad\\u0007Name\",\"age\":30}");
         assertThat(ctrlResp.statusCode()).isEqualTo(400);
+        HttpResponse<String> xssResp = post("/api/patients", "{\"name\":\"<script>alert(1)</script>\",\"age\":30}");
+        assertThat(xssResp.statusCode()).isEqualTo(400);
 
-        // 5. Wrong HTTP method returns 405 with Allow header and Cache-Control: no-store
+        // 4b. Unsupported Content-Type returns 415 Unsupported Media Type
+        HttpRequest textReq = HttpRequest.newBuilder(URI.create(baseUrl + "/api/patients"))
+                .header("Content-Type", "text/plain")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"Alice\",\"age\":30}"))
+                .build();
+        HttpResponse<String> mediaResp = client.send(textReq, HttpResponse.BodyHandlers.ofString());
+        assertThat(mediaResp.statusCode()).isEqualTo(415);
+
+        // 5. Wrong HTTP method returns 405 with Allow header and hardened Cache-Control
         HttpResponse<String> methodResp = client.send(
                 HttpRequest.newBuilder(URI.create(baseUrl + "/api/predict")).GET().build(),
                 HttpResponse.BodyHandlers.ofString()
         );
         assertThat(methodResp.statusCode()).isEqualTo(405);
         assertThat(methodResp.headers().firstValue("Allow")).contains("POST");
-        assertThat(methodResp.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(methodResp.headers().firstValue("Cache-Control")).contains("no-store, no-cache, must-revalidate");
+        assertThat(methodResp.headers().firstValue("Pragma")).contains("no-cache");
         assertThat(methodResp.headers().firstValue("Permissions-Policy")).isPresent();
+        assertThat(methodResp.headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
 
         // 6. CSV formula injection sanitizer neutralizes leading triggers while keeping E.164 phone numbers
         assertThat(com.clinicflow.repository.CsvSanitizer.sanitize("=CMD('calc')")).isEqualTo("'=CMD('calc')");
@@ -237,6 +254,23 @@ class ClinicFlowWebServerTest {
         @SuppressWarnings("unchecked")
         long a3 = ((Number) ((Map<String, Object>) JsonUtil.parseObject(b3.body()).get("appointment")).get("appointmentId")).longValue();
         assertThat(post("/api/queue/cancel", "{\"appointmentId\":" + a3 + "}").body()).contains("CANCELLED");
+    }
+
+    @Test
+    @DisplayName("Per-IP rate limiter returns 429 Too Many Requests when threshold is exceeded")
+    void testRateLimiting() throws Exception {
+        int lastStatus = 200;
+        for (int i = 0; i < 125; i++) {
+            HttpResponse<String> r = client.send(
+                    HttpRequest.newBuilder(URI.create(baseUrl + "/api/doctors")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            lastStatus = r.statusCode();
+            if (lastStatus == 429) {
+                break;
+            }
+        }
+        assertThat(lastStatus).isEqualTo(429);
     }
 
     private HttpResponse<String> post(String path, String jsonBody) throws Exception {

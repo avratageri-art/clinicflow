@@ -28,6 +28,7 @@ final class ClinicApiHandlers {
     private static final int MAX_NAME_LEN = 120;
     private static final int MAX_TEXT_LEN = 120;
     private static final int MAX_NOTES_LEN = 300;
+    private static final int MAX_QUERY_LEN = 500;
     private static final int MAX_AGE = 120;
     private static final int MIN_DOCTOR_AGE = 18;
     private static final int MAX_ALT_SLOTS = 3;
@@ -150,8 +151,7 @@ final class ClinicApiHandlers {
                 List<Map<String, Object>> q = appointmentService.getTodayQueue(LocalDate.now()).stream().map(ApiResponseMapper::toAppointmentMap).toList();
                 security.sendJson(ex, HTTP_OK, Map.of("date", LocalDate.now().toString(), "queue", q), true);
             } else if ("POST".equalsIgnoreCase(ex.getRequestMethod())) {
-                Long apptId = ApiResponseMapper.getLong(readJsonBody(ex), "appointmentId");
-                if (apptId == null) throw new ValidationException("appointmentId is required");
+                long apptId = WebSecuritySupport.requirePositiveId(ApiResponseMapper.getLong(readJsonBody(ex), "appointmentId"), "appointmentId");
                 Appointment updated = applyQueueTransition(path, apptId);
                 if (updated == null) security.sendError(ex, HTTP_NOT_FOUND, "Unknown queue action", null);
                 else security.sendJson(ex, HTTP_OK, Map.of("appointment", ApiResponseMapper.toAppointmentMap(updated)), true);
@@ -169,8 +169,7 @@ final class ClinicApiHandlers {
                 List<Map<String, Object>> list = reminderService.getAllReminders().stream().map(ApiResponseMapper::toReminderMap).toList();
                 security.sendJson(ex, HTTP_OK, Map.of("reminders", list, "disclaimer", ReminderService.ACADEMIC_DISCLAIMER), true);
             } else if ("POST".equalsIgnoreCase(ex.getRequestMethod()) && "/api/reminders/send".equals(path)) {
-                Long id = ApiResponseMapper.getLong(readJsonBody(ex), "reminderId");
-                if (id == null) throw new ValidationException("reminderId is required");
+                long id = WebSecuritySupport.requirePositiveId(ApiResponseMapper.getLong(readJsonBody(ex), "reminderId"), "reminderId");
                 ReminderRecord sent = reminderService.simulateSendReminder(id);
                 security.sendJson(ex, HTTP_OK, Map.of("reminderId", sent.getReminderId(), "status", sent.getStatus()), true);
             } else {
@@ -204,7 +203,7 @@ final class ClinicApiHandlers {
         }
         try {
             Map<String, Object> body = readJsonBody(ex);
-            String query = WebSecuritySupport.requireBoundedString(ApiResponseMapper.getString(body, "query", null), "query", MAX_NOTES_LEN, true);
+            String query = WebSecuritySupport.requireBoundedString(ApiResponseMapper.getString(body, "query", null), "query", MAX_QUERY_LEN, true);
             security.sendJson(ex, HTTP_OK, assistantService.answerQuery(query, ApiResponseMapper.getLong(body, "patientId")), true);
         } catch (Exception e) { handleApiException(ex, e); }
     }
@@ -238,6 +237,8 @@ final class ClinicApiHandlers {
         if (patientId == null || doctorId == null || dateStr == null || dateStr.isBlank()) {
             throw new ValidationException("patientId, doctorId, and appointmentDay (YYYY-MM-DD) are required");
         }
+        WebSecuritySupport.requirePositiveId(patientId, "patientId");
+        WebSecuritySupport.requirePositiveId(doctorId, "doctorId");
         Doctor doctor = doctorService.getDoctorById(doctorId)
                 .orElseThrow(() -> new EntityNotFoundException("Doctor with ID " + doctorId + " not found"));
         String hood = WebSecuritySupport.requireBoundedString(ApiResponseMapper.getString(body, "neighbourhood", "CENTRO"), "neighbourhood", MAX_TEXT_LEN, false);
