@@ -112,7 +112,13 @@ class ClinicFlowWebServerTest {
         HttpResponse<String> predResp = post("/api/predict",
                 "{\"age\":28,\"gender\":\"F\",\"appointmentDay\":\"" + futureDate + "\",\"neighbourhood\":\"CENTRO\"}");
         assertThat(predResp.statusCode()).isEqualTo(200);
-        assertThat(predResp.body()).contains("noShowProbability", "riskCategory", "suggestedAction");
+        assertThat(predResp.body()).contains("noShowProbability", "riskCategory", "suggestedAction", "recommendedAction", "triageGuidance");
+
+        // 1b. Register doctor
+        HttpResponse<String> docResp = post("/api/doctors",
+                "{\"name\":\"Dr. Lucas Almeida\",\"specialty\":\"Neurology\",\"roomNumber\":\"Room 402\"}");
+        assertThat(docResp.statusCode()).isEqualTo(201);
+        assertThat(docResp.body()).contains("Dr. Lucas Almeida");
 
         // 2. Register patient
         HttpResponse<String> patResp = post("/api/patients",

@@ -301,7 +301,7 @@
           <table aria-label="Scheduled appointments">
             <thead>
               <tr>
-                <th>Token</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Lead</th><th>No-Show Risk</th><th>Suggested Action</th><th>Status</th>
+                <th>Token</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Lead</th><th>No-Show Risk</th><th>Suggested Action</th><th>Status</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="appointments-body"></tbody>
@@ -338,6 +338,19 @@
             <div><label for="pat-contact">Contact Number</label><input id="pat-contact" type="text" placeholder="+55-27-99000-0000" /></div>
           </div>
           <button class="btn" type="submit" aria-label="Register new patient">Register Patient</button>
+        </form>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem;">
+        <h2>Register Doctor</h2>
+        <form onsubmit="registerDoctor(event)">
+          <div class="form-grid">
+            <div><label for="doc-name">Doctor Name</label><input id="doc-name" type="text" required /></div>
+            <div><label for="doc-specialty">Specialty</label><input id="doc-specialty" type="text" value="General Medicine" required /></div>
+            <div><label for="doc-room">Room Number</label><input id="doc-room" type="text" value="Room 108" required /></div>
+            <div><label for="doc-contact">Contact Number</label><input id="doc-contact" type="text" placeholder="+55-27-98000-0000" /></div>
+          </div>
+          <button class="btn" type="submit" aria-label="Register new doctor">Register Doctor</button>
         </form>
       </div>
 
@@ -436,20 +449,26 @@
         docSel.innerHTML = doctors.doctors.map(d => `<option value="${d.id}">${d.name} (${d.specialty})</option>`).join('');
 
         document.getElementById('appointments-body').innerHTML = appts.appointments.map(a => {
-          const risk = a.prediction && a.prediction.riskCategory ? a.prediction.riskCategory : 'N/A';
+          const risk = a.prediction && a.prediction.riskCategory ? a.prediction.riskCategory : 'LOW';
           const prob = a.prediction && a.prediction.noShowProbability != null ? (a.prediction.noShowProbability * 100).toFixed(1) + '%' : '-';
           const act = a.prediction && a.prediction.suggestedAction ? a.prediction.suggestedAction : '-';
+          const canCheckIn = a.attendanceStatus === 'SCHEDULED';
+          const canCancel = a.attendanceStatus === 'SCHEDULED' || a.attendanceStatus === 'CHECKED_IN';
           return `<tr>
             <td><strong>${a.queueToken || '-'}</strong></td>
-            <td>${a.patientName}</td>
-            <td>${a.doctorName}</td>
-            <td>${a.appointmentDay} ${a.appointmentTime}</td>
-            <td>${a.leadDays}d</td>
+            <td>${a.patientName || 'Unknown'}</td>
+            <td>${a.doctorName || 'Unknown'}</td>
+            <td>${a.appointmentDay || '-'} ${a.appointmentTime || ''}</td>
+            <td>${a.leadDays != null ? a.leadDays : 0}d</td>
             <td>${riskBadge(risk, ' (' + prob + ')')}</td>
             <td>${act}</td>
-            <td>${a.attendanceStatus}</td>
+            <td>${a.attendanceStatus || '-'}</td>
+            <td>
+              ${canCheckIn ? `<button class="btn btn-sm" onclick="queueAction('checkin', ${a.appointmentId})" aria-label="Check in ${a.patientName}">Check In</button>` : ''}
+              ${canCancel ? `<button class="btn btn-sm btn-secondary" onclick="queueAction('cancel', ${a.appointmentId})" aria-label="Cancel ${a.patientName}">Cancel</button>` : ''}
+            </td>
           </tr>`;
-        }).join('');
+        }).join('') || '<tr><td colspan="9">No appointments scheduled yet.</td></tr>';
 
         document.getElementById('queue-body').innerHTML = queue.queue.map(q => `<tr>
           <td><strong>${q.queueToken}</strong></td>
@@ -550,6 +569,27 @@
         refreshAll();
       } catch (err) {
         showToast('Registration error: ' + err.message);
+      }
+    }
+
+    async function registerDoctor(e) {
+      e.preventDefault();
+      try {
+        const res = await api('/api/doctors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('doc-name').value,
+            specialty: document.getElementById('doc-specialty').value,
+            roomNumber: document.getElementById('doc-room').value,
+            contactNumber: document.getElementById('doc-contact').value
+          })
+        });
+        showToast(`Registered doctor ${res.doctor.name} (${res.doctor.specialty})`);
+        e.target.reset();
+        refreshAll();
+      } catch (err) {
+        showToast('Doctor registration error: ' + err.message);
       }
     }
 

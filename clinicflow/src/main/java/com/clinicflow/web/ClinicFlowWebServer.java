@@ -251,21 +251,48 @@ public class ClinicFlowWebServer {
     }
 
     private void handleDoctors(HttpExchange ex) throws IOException {
-        if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) {
-            sendJson(ex, 405, Map.of("error", "Method not allowed"));
-            return;
+        String method = ex.getRequestMethod();
+        try {
+            if ("GET".equalsIgnoreCase(method)) {
+                List<Map<String, Object>> list = new ArrayList<>();
+                for (Doctor d : doctorService.getAllDoctors()) {
+                    list.add(toDoctorMap(d));
+                }
+                sendJson(ex, 200, Map.of("doctors", list));
+            } else if ("POST".equalsIgnoreCase(method)) {
+                Map<String, Object> body = readJsonBody(ex);
+                String name = requireBoundedString(getString(body, "name"), "name", MAX_NAME_LENGTH, true);
+                Gender gender = Gender.fromCode(getString(body, "gender", "F"));
+                int age = getInt(body, "age", 40);
+                if (age < 18 || age > MAX_AGE) {
+                    throw new ValidationException("Doctor age must be between 18 and " + MAX_AGE);
+                }
+                String specialty = requireBoundedString(getString(body, "specialty", "General Medicine"), "specialty", MAX_TEXT_LENGTH, true);
+                String roomNumber = requireBoundedString(getString(body, "roomNumber", "Room 101"), "roomNumber", 40, false);
+                String contactNumber = requireBoundedString(getString(body, "contactNumber", ""), "contactNumber", 30, false);
+                boolean available = getBool(body, "available", true);
+
+                Doctor saved = doctorService.registerDoctor(null, name, gender, age, specialty, roomNumber, contactNumber, available);
+                sendJson(ex, 201, Map.of("doctor", toDoctorMap(saved)));
+            } else {
+                sendJson(ex, 405, Map.of("error", "Method not allowed"));
+            }
+        } catch (Exception e) {
+            handleApiException(ex, e);
         }
-        List<Map<String, Object>> list = new ArrayList<>();
-        for (Doctor d : doctorService.getAllDoctors()) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", d.getId());
-            m.put("name", d.getName());
-            m.put("specialty", d.getSpecialty());
-            m.put("roomNumber", d.getRoomNumber());
-            m.put("available", d.isAvailable());
-            list.add(m);
-        }
-        sendJson(ex, 200, Map.of("doctors", list));
+    }
+
+    private Map<String, Object> toDoctorMap(Doctor d) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", d.getId());
+        m.put("name", d.getName());
+        m.put("gender", d.getGender().name());
+        m.put("age", d.getAge());
+        m.put("specialty", d.getSpecialty());
+        m.put("roomNumber", d.getRoomNumber());
+        m.put("contactNumber", d.getContactNumber());
+        m.put("available", d.isAvailable());
+        return m;
     }
 
     private void handleAppointments(HttpExchange ex) throws IOException {
@@ -546,6 +573,7 @@ public class ClinicFlowWebServer {
         m.put("attendanceProbability", pred.getAttendanceProbability());
         m.put("riskCategory", pred.getRiskCategory() != null ? pred.getRiskCategory().name() : null);
         m.put("suggestedAction", pred.getSuggestedAction() != null ? pred.getSuggestedAction().name() : null);
+        m.put("recommendedAction", pred.getSuggestedAction() != null ? pred.getSuggestedAction().name() : null);
         m.put("actionDescription", pred.getSuggestedAction() != null ? pred.getSuggestedAction().getActionDescription() : pred.getStatusMessage());
         return m;
     }
