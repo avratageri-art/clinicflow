@@ -1,189 +1,97 @@
-# ClinicFlow — Smart Patient No-Show Prediction & Clinic Queue Assistant
+# ClinicFlow — Smart Patient No-Show Prediction & Clinical Queue Copilot
 
 [![Java](https://img.shields.io/badge/Java-17%20LTS-orange.svg)](https://openjdk.org/)
 [![ML Engine](https://img.shields.io/badge/ML-Weka%203.8.6%20RandomForest-green.svg)](https://www.cs.waikato.ac.nz/ml/weka/)
-[![Cloud Run](https://img.shields.io/badge/Deploy-Google%20Cloud%20Run-4285F4.svg)](https://cloud.google.com/run)
-[![Tests](https://img.shields.io/badge/Tests-JUnit%205%20%2B%20AssertJ-brightgreen.svg)](https://junit.org/junit5/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7.svg)](https://clinicflow-9uhp.onrender.com/)
+[![Tests](https://img.shields.io/badge/Tests-49%2B%20JUnit%205%20Passing-brightgreen.svg)](https://junit.org/junit5/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**ClinicFlow** is a Cloud Run / Render–ready Java 17 web service, ML decision-support engine, and clinical queue assistant for outpatient clinics. It predicts patient appointment no-show risk at booking time using a **Weka Random Forest** classifier and pairs predictions with context-aware outreach actions, lower-risk slot recommendations, and a strict FIFO clinic queue.
-
-> **Live Deployed Demo:** [https://clinicflow-9uhp.onrender.com/](https://clinicflow-9uhp.onrender.com/)
-
----
-
-## 1. Chosen Vertical
-
-**Open Innovation** — Healthcare Operations & Smart Clinical Triage Assistant.
+> **Live Deployed Demo:** [https://clinicflow-9uhp.onrender.com/](https://clinicflow-9uhp.onrender.com/)  
+> **Health Endpoint:** [https://clinicflow-9uhp.onrender.com/health](https://clinicflow-9uhp.onrender.com/health)
 
 ---
 
-## 2. Problem Statement & Persona
+## 1. Problem Statement & Chosen Vertical
 
-**Persona:** Outpatient Clinic Front-Desk Coordinator & Care Navigator.
+**Chosen Vertical:** **Open Innovation** — Healthcare Operations & Smart Clinical Triage Assistant.  
+**Target Persona:** Outpatient Clinic Front-Desk Coordinator & Care Navigator.
 
-Missed outpatient appointments ("no-shows") leave physician consultation slots idle, lengthen patient backlogs, and disrupt same-day clinic flow. In real clinical datasets, ~80% of appointments are attended, which causes naive majority-class heuristics to miss high-risk bookings until it is too late to intervene.
-
-ClinicFlow acts as an intelligent, non-punitive assistant for clinic coordinators:
-- Evaluates every new booking or simulated slot in real time.
-- Recommends targeted outreach tailored to the patient's risk tier.
-- Surfaces lower-risk alternative appointment dates when a booking has elevated no-show risk.
-- Manages same-day check-ins and consultations through a fair, FIFO queue.
+Missed outpatient appointments ("no-shows") account for ~20% of scheduled clinic slots in real-world public health systems, leaving physicians idle while other patients wait weeks for care. Because ~80% of patients do attend, naive rules fail to flag elevated-risk bookings early enough for non-punitive outreach, and coordinators lack a unified tool to balance doctor load, dispatch targeted reminders, and manage same-day walk-ins fairly.
 
 ---
 
-## 3. Approach & Decision Logic
+## 2. Proposed AI Solution & Decision Logic
 
-### ML Prediction Pipeline
-ClinicFlow trains and evaluates three Weka 3.8.6 classifiers on a chronological 80/20 split (preventing temporal leakage):
-1. **`ZeroR`** (majority-class baseline)
-2. **`RandomForest`** (100 trees, seed `42`)
-3. **Class-Balanced `RandomForest`** (`FilteredClassifier` with `ClassBalancer` applied strictly to the training partition)
+**ClinicFlow** pairs a **Weka 3.8.6 Random Forest** no-show prediction engine with a **Context-Aware Smart Clinical Assistant** (`ClinicalAssistantService`) and a **strict FIFO Queue Manager**:
 
-The pipeline selects the optimal model by minority-class (`YES` no-show) F1-score while preserving ROC-AUC, and serializes both the classifier and its `ModelMetadata` to `models/`. On startup in a fresh container (when no `.model` file is present), ClinicFlow automatically trains on the compact self-contained dataset (`clinicflow/data/raw/sample_appointments.csv`) so it runs out-of-the-box in seconds.
+1. **Booking-Time ML Prediction (Zero Target Leakage):**
+   - Evaluates every booking or simulation using only features known at booking time: `leadTimeDays`, `appointmentWeekday`, `bookingWeekday`, `bookingHour`, `sameDayBooking`, and `age`.
+   - Compares `ZeroR`, standard `RandomForest` (100 trees, seed `42`), and `ClassBalancer` + `RandomForest` on a chronological 80/20 split, automatically persisting and serving the best classifier.
+2. **Context-Aware Smart Clinical Assistant (`POST /api/assistant/query`):**
+   - Inspects live clinic state (patients, doctors, active bookings, ML probabilities, FIFO queue load, and pending reminders) to answer natural-language coordinator queries across 5 operational intents:
+     - `HIGH_RISK_TRIAGE` — Ranks active patients by no-show risk, explains *why* each was flagged (lead time + ML score), and surfaces 1-click reminder actions.
+     - `DOCTOR_LOAD_BALANCING` — Compares active slot load across physicians to spot bottlenecks.
+     - `REMINDER_ACTION_PLAN` — Prioritizes pending outreach (`PHONE_CALL` -> `CONFIRMATION_LINK` -> `STANDARD`).
+     - `OPTIMAL_SLOT_FINDER` — Scans the next 10 clinic days (excluding Sundays) to recommend the lowest-risk alternative dates with 1-click booking pre-fill.
+     - `CLINIC_BRIEFING` — Auto-loads on startup with a live operational summary and next priority action.
+3. **Risk Stratification & Advisory-Only Fairness:**
+   - **LOW (`< 20%`):** `STANDARD` automated SMS 24h prior.
+   - **MEDIUM (`20% – 49.9%`):** `CONFIRMATION_LINK` two-way SMS + alternative slot suggestions.
+   - **HIGH (`>= 50%`):** `PHONE_CALL` coordinator outreach + top 3 lower-risk alternative slots.
+   - **Non-Punitive Rule:** ML predictions never auto-cancel bookings or demote patients in today's FIFO queue.
 
-### Feature Engineering (Zero Target Leakage)
-Only features known at the exact moment of booking are used:
-- `leadTimeDays` — days between `ScheduledDay` and `AppointmentDay`
-- `appointmentWeekday` — day of week of the consultation
-- `bookingWeekday` — day of week the booking was created
-- `bookingHour` — hour of day the booking was created
-- `sameDayBooking` — `YES` / `NO` indicator for walk-in/same-day bookings
-- `age` — validated patient age (`0–125`)
+---
 
-Identifiers (`PatientId`, `AppointmentID`) and post-booking outcomes (`SMS_received`) are strictly excluded.
+## 3. Verified Feature-to-Code Traceability Matrix
 
-### Risk Stratification & Context-Aware Actions
-Configurable via `CLINICFLOW_LOW_RISK_THRESHOLD` (default `0.20`) and `CLINICFLOW_HIGH_RISK_THRESHOLD` (default `0.50`):
+Every feature documented here is implemented and wired end-to-end:
 
-| Risk Tier | No-Show Probability | Recommended Outreach (`ReminderAction`) | Smart Queue / Scheduling Guidance |
+| Capability | Backend Class | API Endpoint | Web UI Panel (`index.html`) |
 | :--- | :--- | :--- | :--- |
-| **LOW** | `< 20%` | `STANDARD` — Automated SMS 24h prior | Normal slot confirmation |
-| **MEDIUM** | `20% – 49.9%` | `CONFIRMATION_LINK` — Two-way SMS confirmation link | Suggest lower-risk alternative dates if needed |
-| **HIGH** | `>= 50%` | `PHONE_CALL` — Coordinator phone outreach | Surface top 3 lower-risk alternative slots + backfill planning |
+| **Smart Clinical Copilot** | `ClinicalAssistantService` | `POST /api/assistant/query` | Overview -> **Smart Clinical Assistant** (auto-briefing, prompt input, 4 quick chips, 1-click actions) |
+| **Live Risk & Slot Simulator** | `WekaNoShowPredictionService`, `AppointmentService` | `POST /api/predict` | Overview -> **Live No-Show Risk & Slot Simulator** (clickable low-risk slot buttons) |
+| **Dashboard KPIs** | `ClinicFlowWebServer` | `GET /api/dashboard` | Overview -> 5 live KPI cards |
+| **Appointments & ML Booking** | `AppointmentService` | `GET / POST /api/appointments` | Appointments -> Book form, triage guidance, table with **Check In** / **Cancel** |
+| **FIFO Clinic Queue** | `AppointmentService` | `GET /api/queue`, `POST /api/queue/{checkin,start,complete,noshow,cancel}` | Clinic Queue (FIFO) -> Check-In, Start, Complete, No-Show |
+| **Patient & Doctor Directory** | `PatientService`, `DoctorService` | `GET / POST /api/patients`, `GET / POST /api/doctors` | Patients & Reminders -> Register Patient & Register Doctor forms |
+| **Reminder Outreach Audit** | `ReminderService` | `GET /api/reminders`, `POST /api/reminders/send` | Patients & Reminders -> Reminder Outreach Queue |
+| **ML Insights & Retraining** | `ModelInsightsService`, `NoShowModelTrainer` | `GET /api/model/insights`, `POST /api/model/retrain` | ML Model Insights -> Metrics, features, **Retrain Model** button |
 
 ---
 
-## 4. System Architecture & How It Works
+## 4. Security, Efficiency & Accessibility (WCAG 2.1 AA)
 
-```text
-Accessible Web UI (index.html: <header>, <nav>, <main>, ARIA)
-        │  REST / JSON (0.0.0.0:$PORT, default 8080)
-        ▼
-ClinicFlowWebServer (com.sun.net.httpserver.HttpServer)
-        │
-        ├── /health, /api/dashboard, /api/predict
-        ├── /api/patients, /api/doctors, /api/appointments
-        ├── /api/queue/* (checkin, start, complete, noshow, cancel)
-        └── /api/reminders/*, /api/model/insights, /api/model/retrain
-        │
-        ▼
-Service Layer (AppointmentService, PatientService, DoctorService,
-               ReminderService, WekaNoShowPredictionService, ModelInsightsService)
-        │
-        ├──────────────────────────────────────┐
-        ▼                                      ▼
-Csv*Repository (atomic temp-write + rename)   Weka ML Engine (NoShowModelTrainer,
-data/app/*.csv                                 DataPreprocessor, FeatureExtractor,
-                                               NoShowPredictor, ModelEvaluator)
-```
-
-### API Endpoints
-| Method & Path | Purpose |
-| :--- | :--- |
-| `GET /health` | Service health and ML model readiness check |
-| `GET /api/dashboard` | Real-time KPI summary, queue count, and risk distribution |
-| `POST /api/predict` | Live Weka no-show prediction, `triageGuidance`, and lower-risk slots |
-| `GET / POST /api/patients` | List or register patients (validated + CSV-sanitized) |
-| `GET / POST /api/doctors` | List or register attending doctors |
-| `GET / POST /api/appointments` | List or book appointments with ML risk & queue token assignment |
-| `GET /api/queue` | Retrieve today's active FIFO queue |
-| `POST /api/queue/checkin` | Check in a scheduled appointment into today's queue |
-| `POST /api/queue/start` | Start consultation (`IN_CONSULTATION`) |
-| `POST /api/queue/complete` | Complete consultation (`ATTENDED`) |
-| `POST /api/queue/noshow` | Record patient no-show (`NO_SHOW`) |
-| `POST /api/queue/cancel` | Cancel an appointment (`CANCELLED`) |
-| `GET /api/reminders` | List pending/sent reminder outreach records |
-| `POST /api/reminders/send` | Simulate reminder dispatch and update audit log |
-| `GET /api/model/insights` | Model metadata, feature schema, and evaluation metrics |
-| `POST /api/model/retrain` | Retrain Weka Random Forest pipeline on demand |
-
-### Directory Structure
-```text
-.
-├── Dockerfile                  # Multi-stage Java 17 build (-XX:+UseSerialGC -Xms64m -Xmx300m)
-├── render.yaml                 # Render.com Blueprint (free-tier Docker web service)
-├── .dockerignore               # Excludes build outputs, .git, and local staging dirs
-├── .gitignore                  # Excludes target/, large datasets/models, IDE metadata
-├── .env.example                # Optional environment variable overrides
-├── README.md                   # Hackathon technical documentation
-├── docs/                       # Architecture diagrams
-└── clinicflow/
-    ├── pom.xml                 # Maven build (Java 17, Weka 3.8.6, Commons CSV, JUnit 5)
-    ├── data/
-    │   ├── raw/sample_appointments.csv   # Compact self-contained dataset (< 20 KB)
-    │   └── app/                          # Seeded operational CSV stores
-    └── src/
-        ├── main/java/com/clinicflow/
-        │   ├── Main.java                 # Web server (--server / $PORT), CLI (--cli), Swing GUI
-        │   ├── ml/                       # Preprocessing, FeatureExtractor, Trainer, Evaluator
-        │   ├── model/                    # Patient, Doctor, Appointment, PredictionResult, RiskCategory
-        │   ├── repository/               # CSV & InMemory repositories + CsvSanitizer
-        │   ├── service/                  # Clinical business logic & ML prediction service
-        │   ├── ui/                       # Desktop Swing panels (optional local GUI mode)
-        │   ├── web/                      # ClinicFlowWebServer & JsonUtil
-        │   └── util/                     # ApplicationConfig & domain exceptions
-        ├── main/resources/web/index.html # Accessible single-page web UI
-        └── test/java/com/clinicflow/     # JUnit 5 + AssertJ unit & web integration tests
-```
-
-### Security & Accessibility Safeguards
-- **No hardcoded secrets:** All configuration is environment-driven (`.env.example`); no API keys, tokens, or credentials exist in source control.
-- **Input validation & CSV sanitization:** Request bodies are bounded (`64 KB`), string lengths and age bounds (`0–120`) are enforced, CSV cells are protected against formula injection (`CsvSanitizer`), and errors return structured JSON without stack traces.
-- **Container & HTTP hardening:** Multi-stage Docker build runs under non-root user `clinicflow` (`-Xmx300m` for 512 MB containers) and sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Content-Security-Policy`.
-- **Accessibility (WCAG 2.1 AA):** Semantic `<header>`, `<nav>`, `<main>`, and `<footer>` landmarks, skip-to-content link, explicit `<label for="...">` bindings, `aria-label` on controls, `aria-live="polite"` status regions, `:focus-visible` keyboard rings, text+icon risk badges (`✓ LOW`, `! MEDIUM`, `▲ HIGH`), and a header **High-Contrast Mode** toggle (`aria-pressed`).
+- **Security:** `CsvSanitizer` prevents CSV formula injection (`=`, `+`, `-`, `@`, `\t`, `\r`); `POST` payloads are bounded to `64 KB`; string lengths and ages (`0–120`) are validated; HTTP responses set `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Content-Security-Policy`; Docker runs as non-root user `clinicflow`.
+- **Efficiency:** Weka `RandomForest` is loaded once into memory; `HttpServer` uses a bounded `Executors.newFixedThreadPool(8)`; `Dockerfile` tunes JVM memory (`-XX:+UseSerialGC -Xms64m -Xmx300m`) for 512 MB containers.
+- **Accessibility:** `<html lang="en">`, semantic `<header>`, `<nav>`, `<main>`, `<footer>`, skip-to-content link, `<label for="...">` bindings, `aria-live="polite"`, `:focus-visible` outlines, text+icon risk badges (`✓ LOW`, `! MEDIUM`, `▲ HIGH`), and a header **High-Contrast Mode** toggle (`aria-pressed`).
 
 ---
 
 ## 5. Assumptions & Limitations
 
-- **Advisory-Only AI:** Risk predictions guide outreach intensity and slot suggestions only. High-risk patients are **never** denied care or demoted in the clinic queue (same-day queue order is strictly FIFO by check-in time).
-- **Compact Default Dataset:** To keep the repository lightweight (< 3 MB), `sample_appointments.csv` (200 records) is bundled for instant startup and testing. If the full 110,527-row Kaggle Medical Appointment No-Shows CSV is placed at `clinicflow/data/raw/appointments.csv`, ClinicFlow automatically uses it.
-- **Local & Ephemeral Persistence:** Operational records (`patients.csv`, `doctors.csv`, `appointments.csv`, `reminders.csv`) are persisted locally via atomic CSV writes. On stateless free-tier containers (Render / Cloud Run), container restarts reset ephemeral filesystem state unless backed by a persistent disk or external database.
-- **Simulated Reminders:** SMS/phone dispatches are simulated and audited locally without external messaging gateway charges.
+- **Advisory-Only AI:** Predictions guide coordinator outreach and slot suggestions only; no automated patient denial or queue demotion occurs.
+- **Compact Default Dataset:** `clinicflow/data/raw/sample_appointments.csv` (200 records, `< 20 KB`) is bundled for instant startup and retraining. If the full 110,527-row Kaggle dataset is placed at `clinicflow/data/raw/appointments.csv`, ClinicFlow uses it automatically.
+- **Ephemeral Container Persistence:** Operational CSVs (`data/app/*.csv`) are written atomically to local disk; on stateless free-tier containers (Render / Cloud Run), state resets on container restart unless backed by a persistent volume.
+- **Simulated Reminders:** SMS/phone dispatches are simulated locally without external messaging gateway charges.
 
 ---
 
-## 6. Quickstart & Google Cloud Run Deployment
+## 6. Quickstart & Deployment
 
-### Run Automated Tests
 ```bash
+# Run full automated test suite (JUnit 5 + AssertJ)
 mvn -f clinicflow/pom.xml test
-```
 
-### Run Locally (Web Server on `http://localhost:8080`)
-```bash
+# Build and run web server locally on http://localhost:8080
 mvn -f clinicflow/pom.xml package -DskipTests
 java -Djava.awt.headless=true -jar clinicflow/target/clinicflow-1.0.0-SNAPSHOT.jar --server
-```
 
-### Run CLI Verification Mode
-```bash
-java -Djava.awt.headless=true -jar clinicflow/target/clinicflow-1.0.0-SNAPSHOT.jar --cli
-```
-
-### Build & Run Docker Container Locally
-```bash
+# Build & run Docker container
 docker build -t clinicflow:latest .
 docker run --rm -p 8080:8080 -e PORT=8080 clinicflow:latest
 ```
 
-### Deploy to Google Cloud Run
+Deploy to **Render** via [render.yaml](render.yaml) or **Google Cloud Run**:
 ```bash
-gcloud run deploy clinicflow \
-  --source . \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --port 8080
+gcloud run deploy clinicflow --source . --platform managed --region asia-south1 --allow-unauthenticated --port 8080 --memory 1Gi
 ```

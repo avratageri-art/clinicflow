@@ -233,6 +233,23 @@
         <div class="card"><div class="kpi-label">Pending Reminders</div><div class="kpi-value" id="kpi-reminders">-</div></div>
       </div>
 
+      <div class="card" style="margin-bottom:1.25rem;" id="copilot-card">
+        <h2>Smart Clinical Assistant (AI Copilot)</h2>
+        <p>Ask context-aware operational questions. ClinicFlow inspects live patients, doctors, ML no-show probabilities, FIFO queue load, and pending reminders to reason and recommend 1-click actions.</p>
+        <form onsubmit="submitAssistantForm(event)" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+          <label for="assistant-query" class="skip-link">Ask the Smart Clinical Assistant</label>
+          <input id="assistant-query" type="text" placeholder="Ask about high-risk patients, doctor load, reminder plan, or optimal slots..." style="flex:1; min-width:240px;" required />
+          <button class="btn" type="submit" aria-label="Ask Smart Clinical Assistant">Ask Assistant</button>
+        </form>
+        <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.75rem;" role="group" aria-label="Quick assistant prompts">
+          <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Who are my highest-risk patients?')">Highest-Risk Patients</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Which doctors are overloaded?')">Doctor Load Balance</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Generate today\'s reminder action plan')">Reminder Action Plan</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="askAssistant('Suggest optimal low-risk slots')">Optimal Low-Risk Slots</button>
+        </div>
+        <div id="assistant-output" class="alert" aria-live="polite">Loading live clinic briefing...</div>
+      </div>
+
       <div class="card">
         <h2>Smart Assistant: Live No-Show Risk &amp; Slot Simulator</h2>
         <p>Evaluate patient no-show risk in real time using the Weka Random Forest model and receive tailored outreach and lower-risk slot recommendations.</p>
@@ -293,6 +310,7 @@
           </div>
           <button class="btn" type="submit" aria-label="Book appointment with ML risk check">Book &amp; Predict Risk</button>
         </form>
+        <div id="book-guidance" class="alert" aria-live="polite" style="display:none;"></div>
       </div>
 
       <div class="card">
@@ -518,15 +536,60 @@
           })
         });
         const p = res.prediction;
-        const slots = (res.recommendedAlternativeSlots || []).map(s => `${s.date} (${(s.noShowProbability * 100).toFixed(1)}% - ${s.riskCategory})`).join(' | ');
+        const slotsHtml = (res.recommendedAlternativeSlots || []).map(s =>
+          `<button type="button" class="btn btn-sm btn-secondary" onclick="applyBookingSlot('${s.date}','${s.time}')" aria-label="Use slot ${s.date} at ${s.time}">${s.date} (${(s.noShowProbability * 100).toFixed(1)}% - ${s.riskCategory})</button>`
+        ).join(' ');
         const box = document.getElementById('sim-result');
         box.style.display = 'block';
         box.innerHTML = `<strong>Predicted No-Show:</strong> ${(p.noShowProbability * 100).toFixed(1)}% &mdash; ${riskBadge(p.riskCategory, '')}<br/>
           <strong>Recommended Action:</strong> ${p.suggestedAction} (${p.actionDescription})<br/>
           <strong>Triage Guidance:</strong> ${res.triageGuidance || ''}<br/>
-          <strong>Lower-Risk Slots:</strong> ${slots || 'Current slot is optimal'}`;
+          <strong>Lower-Risk Slots (click to book):</strong> ${slotsHtml || 'Current slot is optimal'}`;
       } catch (err) {
         showToast('Prediction error: ' + err.message);
+      }
+    }
+
+    function applyBookingSlot(date, time) {
+      document.getElementById('book-date').value = date;
+      if (time) document.getElementById('book-time').value = time.slice(0, 5);
+      switchTab('appointments');
+      showToast(`Applied recommended slot: ${date} ${time ? time.slice(0, 5) : ''}`);
+    }
+
+    async function submitAssistantForm(e) {
+      e.preventDefault();
+      const q = document.getElementById('assistant-query').value.trim();
+      if (q) await askAssistant(q);
+    }
+
+    async function askAssistant(query) {
+      const box = document.getElementById('assistant-output');
+      document.getElementById('assistant-query').value = query;
+      try {
+        const res = await api('/api/assistant/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const steps = (res.reasoningSteps || []).map(s => `<li>${s}</li>`).join('');
+        const actions = (res.recommendedActions || []).map(a => {
+          let btn = '';
+          if (a.oneClickAction) {
+            const act = a.oneClickAction;
+            if (act.type === 'SEND_REMINDER') {
+              btn = ` <button type="button" class="btn btn-sm" onclick="sendReminder(${act.reminderId})">${act.label}</button>`;
+            } else if (act.type === 'APPLY_SLOT') {
+              btn = ` <button type="button" class="btn btn-sm" onclick="applyBookingSlot('${act.date}','${act.time}')">${act.label}</button>`;
+            }
+          }
+          return `<li>${a.detail || ''}${btn}</li>`;
+        }).join('');
+        box.innerHTML = `<strong>Intent:</strong> ${res.intent} &mdash; <strong>${res.answer}</strong>` +
+          (steps ? `<ul style="margin:0.4rem 0 0.4rem 1.2rem;">${steps}</ul>` : '') +
+          (actions ? `<div style="margin-top:0.35rem;"><strong>Recommended Actions:</strong><ul style="margin:0.25rem 0 0 1.2rem;">${actions}</ul></div>` : '');
+      } catch (err) {
+        box.textContent = 'Assistant error: ' + err.message;
       }
     }
 
@@ -545,6 +608,13 @@
           })
         });
         showToast(`Booked ${res.appointment.queueToken} — Risk: ${res.appointment.prediction.riskCategory}`);
+        const bg = document.getElementById('book-guidance');
+        const altBtns = (res.recommendedAlternativeSlots || []).map(s =>
+          `<button type="button" class="btn btn-sm btn-secondary" onclick="applyBookingSlot('${s.date}','${s.time}')">${s.date} (${(s.noShowProbability * 100).toFixed(1)}%)</button>`
+        ).join(' ');
+        bg.style.display = 'block';
+        bg.innerHTML = `<strong>Booking ${res.appointment.queueToken}:</strong> ${res.triageGuidance || ''}` +
+          (altBtns ? `<br/><strong>Lower-Risk Alternatives:</strong> ${altBtns}` : '');
         refreshAll();
       } catch (err) {
         showToast('Booking error: ' + err.message);
@@ -633,6 +703,7 @@
     }
 
     refreshAll();
+    askAssistant("Give me today's clinic briefing");
   </script>
 </body>
 </html>

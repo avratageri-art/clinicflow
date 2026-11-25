@@ -50,6 +50,7 @@ public class ClinicFlowWebServer {
     private final AppointmentService appointmentService;
     private final ReminderService reminderService;
     private final ModelInsightsService modelInsightsService;
+    private final ClinicalAssistantService assistantService;
     private final WekaNoShowPredictionService predictionService;
     private final NoShowModelTrainer modelTrainer;
 
@@ -74,6 +75,7 @@ public class ClinicFlowWebServer {
         this.appointmentService = new AppointmentService(patientRepo, apptRepo, doctorRepo, validator, predictionService);
         this.reminderService = new ReminderService(reminderRepo, apptRepo);
         this.modelInsightsService = new ModelInsightsService(config);
+        this.assistantService = new ClinicalAssistantService(patientService, doctorService, appointmentService, reminderService, predictionService);
         this.modelTrainer = new NoShowModelTrainer(new DataPreprocessor(), new ModelEvaluator(), new ModelRepository(), config);
 
         seedInitialDataIfNeeded();
@@ -116,6 +118,7 @@ public class ClinicFlowWebServer {
         server.createContext("/api/queue", this::handleQueue);
         server.createContext("/api/reminders", this::handleReminders);
         server.createContext("/api/model", this::handleModel);
+        server.createContext("/api/assistant/query", this::handleAssistantQuery);
 
         server.start();
         LOGGER.info("ClinicFlow web server listening on http://0.0.0.0:" + boundPort);
@@ -524,6 +527,21 @@ public class ClinicFlowWebServer {
                 return;
             }
             sendJson(ex, 404, Map.of("error", "Not found"));
+        } catch (Exception e) {
+            handleApiException(ex, e);
+        }
+    }
+
+    private void handleAssistantQuery(HttpExchange ex) throws IOException {
+        if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
+            sendJson(ex, 405, Map.of("error", "Method not allowed"));
+            return;
+        }
+        try {
+            Map<String, Object> body = readJsonBody(ex);
+            String query = requireBoundedString(getString(body, "query"), "query", MAX_NOTES_LENGTH, true);
+            Long patientId = getLong(body, "patientId");
+            sendJson(ex, 200, assistantService.answerQuery(query, patientId));
         } catch (Exception e) {
             handleApiException(ex, e);
         }

@@ -151,7 +151,23 @@ class ClinicFlowWebServerTest {
         assertThat(complete.statusCode()).isEqualTo(200);
         assertThat(complete.body()).contains("ATTENDED");
 
-        // 5. Dashboard & model insights
+        // 5. Smart Clinical Assistant context-aware queries
+        HttpResponse<String> briefResp = post("/api/assistant/query", "{\"query\":\"Give me today's clinic briefing\"}");
+        assertThat(briefResp.statusCode()).isEqualTo(200);
+        assertThat(briefResp.body()).contains("CLINIC_BRIEFING", "reasoningSteps", "clinicContext");
+
+        HttpResponse<String> docLoadResp = post("/api/assistant/query", "{\"query\":\"Which doctors are overloaded?\"}");
+        assertThat(docLoadResp.statusCode()).isEqualTo(200);
+        assertThat(docLoadResp.body()).contains("DOCTOR_LOAD_BALANCING", "Dr. Lucas Almeida");
+
+        HttpResponse<String> slotResp = post("/api/assistant/query", "{\"query\":\"Suggest optimal low-risk slots\",\"patientId\":" + patientId + "}");
+        assertThat(slotResp.statusCode()).isEqualTo(200);
+        assertThat(slotResp.body()).contains("OPTIMAL_SLOT_FINDER", "APPLY_SLOT");
+
+        HttpResponse<String> emptyQuery = post("/api/assistant/query", "{\"query\":\"   \"}");
+        assertThat(emptyQuery.statusCode()).isEqualTo(400);
+
+        // 6. Dashboard & model insights
         HttpResponse<String> dash = client.send(
                 HttpRequest.newBuilder(URI.create(baseUrl + "/api/dashboard")).GET().build(),
                 HttpResponse.BodyHandlers.ofString()
