@@ -1,0 +1,48 @@
+﻿# Environment & local secrets
+.env
+.env.local
+*.env
+
+# Local toolchain & archives
+tools/
+*.zip
+*.tar.gz
+*.7z
+
+# Maven build outputs
+target/
+clinicflow/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Oversized datasets & generated bulk reports (>10 MB hackathon limit)
+clinicflow/data/raw/appointments.csv
+clinicflow/data/processed/clean_appointments.csv
+clinicflow/reports/test-predictions.csv
+
+# Large serialized ML model (233.9 MB; excluded from Git)
+clinicflow/models/*.model
+models/*.model
+
+# Temporary files & logs
+*.log
+*.tmp
+data/app/*.tmp
+clinicflow/data/app/*.tmp
+
+# IDE & OS metadata
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local reference / staging directories (kept untouched on disk)
+JAVA_ML/
+smartcare-ai/

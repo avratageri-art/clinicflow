@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.env.*
+clinicflow/target
+clinicflow/models/*.model
+clinicflow/data/raw/appointments.csv
+clinicflow/data/processed/clean_appointments.csv
+clinicflow/reports/test-predictions.csv
+JAVA_ML
+smartcare-ai
+*.log
+*.tmp
+*.zip
+.idea
+.vscode
